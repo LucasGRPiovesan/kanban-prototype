@@ -18,7 +18,7 @@ import { ApiError } from '@/lib/api/client';
 import { demandsApi } from '@/lib/api/endpoints';
 import { cn } from '@/lib/cn';
 import { brToIso, formatFileSize, isoToBr, maskDateInput } from '@/lib/format';
-import { demandKeys, useMoveDemand, useProjects } from '@/features/kanban/useDemands';
+import { demandKeys, useProjects } from '@/features/kanban/useDemands';
 import { DEMAND_PRIORITIES, DEMAND_STATUSES, type DemandStatus } from '@/lib/api/types';
 import { PrioritySelect } from './PrioritySelect';
 import { StatusSelect } from './StatusSelect';
@@ -115,6 +115,11 @@ export function DemandFormPage() {
    */
   const [draftChecklist, setDraftChecklist] = useState<string[]>([]);
   const [pendingProductionMove, setPendingProductionMove] = useState(false);
+  /*
+   * Status is a draft like every other field here — it only reaches the server when
+   * "Salvar" is pressed, not on selection. `null` until the existing demand loads.
+   */
+  const [statusDraft, setStatusDraft] = useState<DemandStatus | null>(null);
 
   const projectsQuery = useProjects();
   const existingQuery = useQuery({
@@ -122,7 +127,6 @@ export function DemandFormPage() {
     queryFn: () => demandsApi.get(uuid!),
     enabled: isEdit,
   });
-  const moveMutation = useMoveDemand(existingQuery.data?.project?.uuid);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -167,6 +171,7 @@ export function DemandFormPage() {
       responsibleUuid: demand.responsible.uuid,
       priority: demand.priority,
     });
+    setStatusDraft(demand.status);
   }, [existingQuery.data, form]);
 
   const selectedResponsible = form.watch('responsibleUuid');
@@ -257,6 +262,15 @@ export function DemandFormPage() {
             status: targetStatus,
           });
 
+      /*
+       * Status travels through its own endpoint — the one with the produção rules —
+       * but only once "Salvar" is actually pressed, same as every other field: nothing
+       * here reaches the server on selection alone.
+       */
+      if (isEdit && statusDraft && statusDraft !== existingQuery.data?.status) {
+        await demandsApi.move(uuid!, statusDraft);
+      }
+
       if (pendingFiles.length > 0) {
         await demandsApi.uploadAttachments(target.uuid, pendingFiles);
       }
@@ -310,54 +324,29 @@ export function DemandFormPage() {
   const canEditProject = !isEdit || can('DEMAND_UPDATE_PROJECT');
 
   /*
-   * Status is not part of the form's own save — it commits on selection, the same as
-   * dragging the card on the board or the details panel's own control, reached from
-   * here for whoever is already on this screen editing everything else. It stays
-   * interactive through produção for anyone with DEMAND_UPDATE (only archived locks it
-   * outright): what to do about a locked demand is explained on selection, mirroring
-   * the details panel exactly.
+   * Status is a draft field like the rest of the form — selecting one only stages it;
+   * "Salvar" is what actually sends it, through its own endpoint (the one with the
+   * produção rules), together with everything else on the page. Gated the same as the
+   * form's other fields: DEMAND_UPDATE, and not archived or terminal — a locked demand
+   * has nothing here to stage a change against.
    */
   const canManageProduction = can('DEMAND_MANAGE_PRODUCTION');
-  const canChangeStatus = isEdit && can('DEMAND_UPDATE') && !isArchived;
+  const canChangeStatus = isEdit && can('DEMAND_UPDATE') && !isArchived && !isTerminal;
 
   const handleStatusChange = (status: DemandStatus) => {
-    if (!uuid) {
-      return;
-    }
-    // Entering produção without DEMAND_MANAGE_PRODUCTION is a one-way door — asks
-    // first instead of committing on selection like every other option.
+    // Entering produção without DEMAND_MANAGE_PRODUCTION is a one-way door — asks for
+    // confirmation before even staging it, since "Salvar" would otherwise be the only
+    // warning the choice is irreversible for this person.
     if (status === 'PRODUCTION' && !canManageProduction) {
       setPendingProductionMove(true);
       return;
     }
-    if (isTerminal && !canManageProduction) {
-      notify(
-        'Demandas em produção só podem ser revertidas por quem tem a permissão de gerenciar demandas em produção.',
-        'error',
-      );
-      return;
-    }
-    moveMutation.mutate(
-      { uuid, status },
-      {
-        onError: (error) =>
-          notify(error instanceof ApiError ? error.message : 'Não foi possível mudar o status.', 'error'),
-      },
-    );
+    setStatusDraft(status);
   };
 
   const confirmProductionMove = () => {
-    if (!uuid) {
-      return;
-    }
     setPendingProductionMove(false);
-    moveMutation.mutate(
-      { uuid, status: 'PRODUCTION' },
-      {
-        onError: (error) =>
-          notify(error instanceof ApiError ? error.message : 'Não foi possível mudar o status.', 'error'),
-      },
-    );
+    setStatusDraft('PRODUCTION');
   };
 
   return (
@@ -500,7 +489,7 @@ export function DemandFormPage() {
               </div>
 
               <aside className="min-w-0 space-y-5 lg:border-l lg:border-line lg:pl-6">
-                {isEdit && existingQuery.data && (
+                {isEdit && existingQuery.data && statusDraft && (
                   <section className="space-y-1.5">
                     <h3 className="flex items-center gap-1.5 text-xs font-bold text-subtle">
                       Status
@@ -513,26 +502,33 @@ export function DemandFormPage() {
                     </h3>
 
                     {canChangeStatus ? (
-                      <StatusSelect
-                        value={existingQuery.data.status}
-                        onChange={handleStatusChange}
-                        disabled={moveMutation.isPending}
-                      />
+                      <>
+                        <StatusSelect
+                          value={statusDraft}
+                          onChange={handleStatusChange}
+                          disabled={mutation.isPending}
+                        />
+                        {statusDraft !== existingQuery.data.status && (
+                          <p className="text-xs text-subtle">
+                            Aplicado ao salvar, junto com o restante do formulário.
+                          </p>
+                        )}
+                      </>
                     ) : (
                       <span
                         className={cn(
                           'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold',
-                          STATUS_PRESENTATION[existingQuery.data.status].badgeClass,
+                          STATUS_PRESENTATION[statusDraft].badgeClass,
                         )}
                       >
                         <span
                           className={cn(
                             'h-1.5 w-1.5 rounded-full',
-                            STATUS_PRESENTATION[existingQuery.data.status].dotClass,
+                            STATUS_PRESENTATION[statusDraft].dotClass,
                           )}
                           aria-hidden="true"
                         />
-                        {STATUS_PRESENTATION[existingQuery.data.status].label}
+                        {STATUS_PRESENTATION[statusDraft].label}
                       </span>
                     )}
                   </section>
@@ -702,9 +698,8 @@ export function DemandFormPage() {
       <ConfirmDialog
         open={pendingProductionMove}
         title="Mover para produção"
-        message="Assim que entrar em produção, esta demanda fica travada: só quem tiver a permissão de gerenciar demandas em produção poderá revertê-la e mudar o status dela de novo. Deseja continuar?"
+        message="Assim que entrar em produção, esta demanda fica travada: só quem tiver a permissão de gerenciar demandas em produção poderá revertê-la e mudar o status dela de novo. A mudança só é enviada ao salvar o formulário. Deseja continuar?"
         confirmLabel="Mover para produção"
-        loading={moveMutation.isPending}
         onConfirm={confirmProductionMove}
         onCancel={() => setPendingProductionMove(false)}
       />

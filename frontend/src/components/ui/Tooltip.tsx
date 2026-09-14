@@ -25,7 +25,12 @@ export function Tooltip({
 }) {
   const id = useId();
   const anchorRef = useRef<HTMLSpanElement>(null);
-  const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
+  const [position, setPosition] = useState<{ left: number; top: number; below: boolean } | null>(
+    null,
+  );
+
+  /** Rough allowance for the bubble's own height plus its gap from the anchor. */
+  const ESTIMATED_HEIGHT = 32;
 
   const measure = useCallback(() => {
     const anchor = anchorRef.current;
@@ -33,7 +38,15 @@ export function Tooltip({
       return;
     }
     const rect = anchor.getBoundingClientRect();
-    setPosition({ left: rect.left + rect.width / 2, top: rect.top - 8 });
+    // Above is the default, but an anchor near the top of the viewport — the topbar's
+    // own icons — has nowhere to put it: flipped below, the same way the status
+    // dropdown flips when the panel below it would run past the screen.
+    const below = rect.top < ESTIMATED_HEIGHT;
+    setPosition({
+      left: rect.left + rect.width / 2,
+      top: below ? rect.bottom + 8 : rect.top - 8,
+      below,
+    });
   }, []);
 
   const show = () => measure();
@@ -73,7 +86,11 @@ export function Tooltip({
             id={id}
             role="tooltip"
             style={{ position: 'fixed', left: position.left, top: position.top }}
-            className="pointer-events-none z-[80] -translate-x-1/2 -translate-y-full animate-fade-in whitespace-nowrap rounded-md bg-body px-2 py-1 text-2xs font-semibold text-canvas shadow-lifted"
+            className={cn(
+              'pointer-events-none z-[80] -translate-x-1/2 animate-fade-in whitespace-nowrap rounded-md',
+              'bg-body px-2 py-1 text-2xs font-semibold text-canvas shadow-lifted',
+              position.below ? 'translate-y-0' : '-translate-y-full',
+            )}
           >
             {label}
           </span>,
