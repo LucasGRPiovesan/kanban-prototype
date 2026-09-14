@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Quadro Kanban de projetos e demandas." />
+    <meta name="theme-color" content="#b7e93a" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <title>Kanban de Projetos</title>
+    <script>
+      // Applies the stored theme before first paint, so a dark-theme user never sees a
+      // white flash while the React bundle loads.
+      (function () {
+        try {
+          var stored = localStorage.getItem('kanban.theme');
+          if (stored === 'dark' || stored === 'light') {
+            document.documentElement.setAttribute('data-theme', stored);
+          }
+        } catch (e) {
+          /* storage blocked: fall back to prefers-color-scheme */
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

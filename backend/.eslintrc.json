@@ -1,0 +1,79 @@
+{
+  "root": true,
+  "parser": "@typescript-eslint/parser",
+  "parserOptions": {
+    "ecmaVersion": 2022,
+    "sourceType": "module"
+  },
+  "plugins": [
+    "@typescript-eslint"
+  ],
+  "extends": [
+    "eslint:recommended",
+    "plugin:@typescript-eslint/recommended"
+  ],
+  "env": {
+    "node": true,
+    "es2022": true
+  },
+  "ignorePatterns": [
+    "dist",
+    "node_modules",
+    "prisma/migrations"
+  ],
+  "rules": {
+    "no-console": [
+      "warn",
+      {
+        "allow": [
+          "warn",
+          "error"
+        ]
+      }
+    ],
+    "@typescript-eslint/no-explicit-any": "error",
+    "@typescript-eslint/consistent-type-imports": [
+      "warn",
+      {
+        "prefer": "type-imports",
+        "fixStyle": "inline-type-imports"
+      }
+    ],
+    "@typescript-eslint/no-unused-vars": [
+      "error",
+      {
+        "argsIgnorePattern": "^_",
+        "varsIgnorePattern": "^_"
+      }
+    ],
+    "no-restricted-imports": [
+      "error",
+      {
+        "patterns": [
+          {
+            "group": [
+              "**/modules/*/infrastructure/*",
+              "@prisma/client"
+            ],
+            "message": "Domain and application layers must depend on ports, never on infrastructure or Prisma. Only infrastructure/ and main/ may import these."
+          }
+        ]
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": [
+        "src/**/infrastructure/**/*.ts",
+        "src/main/**/*.ts",
+        "prisma/**/*.ts",
+        "tests/**/*.ts",
+        "scripts/**/*.ts"
+      ],
+      "rules": {
+        "no-restricted-imports": "off",
+        "no-console": "off"
+      }
+    }
+  ]
+}

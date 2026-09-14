@@ -1,0 +1,929 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+/* Quill ships its own chrome; the block at the end of this file re-skins it onto the
+   design tokens so the editor is not a foreign object in the middle of a form. */
+@import 'quill/dist/quill.snow.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Design tokens.
+ *
+ * Every colour in the application resolves through one of these variables — no raw
+ * hex values live in components. That is what makes the dark theme a re-declaration
+ * of the same token set rather than a second, parallel stylesheet.
+ *
+ * The palette is taken from the supplied visual reference: the CSP lime that carries
+ * the sidebar and primary actions, plus the five status hues that identify the Kanban
+ * columns. The dark theme keeps the same identity — lime remains the brand accent —
+ * and only changes what the accent sits on.
+ */
+@layer base {
+  :root {
+    /* Brand — CSP lime */
+    --brand-50: 246 253 232;
+    --brand-100: 235 250 201;
+    --brand-200: 217 245 153;
+    --brand-300: 198 239 94;
+    --brand-400: 183 233 58;
+    --brand-500: 163 217 28;
+    --brand-600: 133 180 18;
+    --brand-700: 101 138 18;
+    --brand-800: 79 108 21;
+    --brand-900: 66 90 23;
+
+    /* Surfaces */
+    --bg: 244 245 243;
+    --surface: 255 255 255;
+    --surface-muted: 249 250 248;
+    --surface-raised: 255 255 255;
+    --border: 226 229 224;
+    --border-strong: 203 208 200;
+
+    /* Text */
+    --text: 24 30 20;
+    --text-muted: 96 106 92;
+    --text-subtle: 138 148 134;
+    --text-on-brand: 24 34 10;
+
+    /* Feedback */
+    --danger: 220 38 38;
+    --danger-surface: 254 242 242;
+    --danger-border: 254 202 202;
+    --success: 22 163 74;
+    --success-surface: 240 253 244;
+    --warning: 217 119 6;
+    --warning-surface: 255 251 235;
+
+    /* Kanban status — accent / column surface / column border */
+    --status-not-started: 130 140 126;
+    --status-not-started-surface: 246 247 245;
+    --status-not-started-border: 224 227 221;
+
+    --status-in-progress: 37 99 235;
+    --status-in-progress-surface: 239 246 255;
+    --status-in-progress-border: 209 226 252;
+
+    --status-paused: 220 38 38;
+    --status-paused-surface: 254 242 242;
+    --status-paused-border: 254 213 213;
+
+    --status-in-review: 217 119 6;
+    --status-in-review-surface: 255 251 235;
+    --status-in-review-border: 253 230 178;
+
+    --status-production: 22 163 74;
+    --status-production-surface: 240 253 244;
+    --status-production-border: 196 240 211;
+
+    /*
+     * Sidebar — solid lime in light mode, as in the reference.
+     *
+     * Per the reference model: the current *nav item* is filled with the tint the model
+     * reserves for hover (brand-300), and hover itself turns the row white with the main
+     * brand green carrying the label and icon — the reverse of an earlier build that put
+     * white on the active row and a plain surface tint on hover.
+     */
+    --sidebar-bg: 183 233 58;
+    --sidebar-text: 32 46 14;
+    --sidebar-text-muted: 62 82 32;
+    --sidebar-active-bg: 198 239 94;
+    --sidebar-active-text: 42 60 16;
+    --sidebar-hover-bg: 255 255 255;
+    --sidebar-hover-text: 101 138 18;
+    --sidebar-border: 163 217 28;
+    /*
+     * A light accent on the solid lime panel (the login screen's headline dot, its
+     * footer rule) — independent of the nav's active-item colour above, which the
+     * model governs on its own and must be free to change without this popping
+     * against the lime panel.
+     */
+    --sidebar-panel-accent: 255 255 255;
+
+    /* The login screen's dot grid: on the lime panel, both layers read as white. */
+    --dot-wave-dot: 255 255 255;
+    --dot-wave-glow: 255 255 255;
+
+    --ring: 101 138 18;
+    --enhancement-bg: 32 46 14;
+    --enhancement-bg-2: 52 74 20;
+    --enhancement-fg: 198 239 94;
+    --enhancement-ring: 183 233 58;
+    --chart-arrivals: 37 99 235;
+    --chart-deliveries: 101 138 18;
+    /* Assistant ("Ação rápida"): deep olive face, lime ink, a lime comet on the rim. */
+    --assistant-bg: 30 43 12;
+    --assistant-bg-2: 58 82 20;
+    --assistant-fg: 217 245 153;
+    --assistant-edge: 44 62 18;
+    --assistant-comet: 198 239 94;
+    --assistant-glow: 101 138 18;
+    --shadow-color: 32 44 20;
+
+    color-scheme: light;
+  }
+
+  /*
+   * Dark theme. The guard lets an explicit `light` choice win over the OS preference,
+   * while the same declarations are repeated under [data-theme='dark'] so the manual
+   * toggle wins in both directions.
+   */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) {
+      --bg: 16 19 14;
+      --surface: 25 29 22;
+      --surface-muted: 21 25 19;
+      --surface-raised: 31 36 27;
+      --border: 46 53 41;
+      --border-strong: 66 75 59;
+
+      --text: 235 240 231;
+      --text-muted: 160 170 153;
+      --text-subtle: 121 132 114;
+      --text-on-brand: 20 28 8;
+
+      --danger: 248 113 113;
+      --danger-surface: 47 25 25;
+      --danger-border: 92 41 41;
+      --success: 74 222 128;
+      --success-surface: 20 40 26;
+      --warning: 251 191 36;
+      --warning-surface: 45 34 12;
+
+      --status-not-started: 148 158 143;
+      --status-not-started-surface: 27 31 24;
+      --status-not-started-border: 48 55 44;
+
+      --status-in-progress: 96 165 250;
+      --status-in-progress-surface: 20 28 42;
+      --status-in-progress-border: 38 57 88;
+
+      --status-paused: 248 113 113;
+      --status-paused-surface: 42 22 22;
+      --status-paused-border: 82 38 38;
+
+      --status-in-review: 251 191 36;
+      --status-in-review-surface: 40 31 13;
+      --status-in-review-border: 82 61 22;
+
+      --status-production: 74 222 128;
+      --status-production-surface: 18 38 25;
+      --status-production-border: 34 70 45;
+
+      /*
+       * The lime moves from field to accent: a full lime panel would glare at night, but
+       * the brand still owns the active item and every primary action. Dark mode is not
+       * governed by the reference model's light-mode colours — the active row keeps its
+       * solid lime fill (it is already the strongest thing on this dark surface), and
+       * hover gets the model's own idea of "pop": a light, elevated surface with the
+       * label and icon in the brand's lightest lime, the dark-theme counterpart of the
+       * light theme's white-hover-with-green-text.
+       */
+      --sidebar-bg: 21 26 17;
+      --sidebar-text: 197 208 187;
+      --sidebar-text-muted: 143 155 133;
+      --sidebar-active-bg: 183 233 58;
+      --sidebar-active-text: 24 34 10;
+      --sidebar-hover-bg: 36 43 29;
+      --sidebar-hover-text: 198 239 94;
+      --sidebar-border: 46 55 37;
+      --sidebar-panel-accent: 183 233 58;
+
+      /* The login screen's dot grid: on the near-black panel, the sweep stays the
+         brand green — only the light theme's lime panel inverts this to white. */
+      --dot-wave-dot: 197 208 187;
+      --dot-wave-glow: 163 217 28;
+
+      --ring: 183 233 58;
+      --enhancement-bg: 183 233 58;
+      --enhancement-bg-2: 163 217 28;
+      --enhancement-fg: 20 28 8;
+      --enhancement-ring: 217 245 153;
+      --chart-arrivals: 59 130 246;
+      --chart-deliveries: 118 163 18;
+      --assistant-bg: 40 56 18;
+      --assistant-bg-2: 24 33 12;
+      --assistant-fg: 217 245 153;
+      --assistant-edge: 52 70 24;
+      --assistant-comet: 183 233 58;
+      --assistant-glow: 133 180 18;
+      --shadow-color: 0 0 0;
+
+      color-scheme: dark;
+    }
+  }
+
+  :root[data-theme='dark'] {
+    --bg: 16 19 14;
+    --surface: 25 29 22;
+    --surface-muted: 21 25 19;
+    --surface-raised: 31 36 27;
+    --border: 46 53 41;
+    --border-strong: 66 75 59;
+
+    --text: 235 240 231;
+    --text-muted: 160 170 153;
+    --text-subtle: 121 132 114;
+    --text-on-brand: 20 28 8;
+
+    --danger: 248 113 113;
+    --danger-surface: 47 25 25;
+    --danger-border: 92 41 41;
+    --success: 74 222 128;
+    --success-surface: 20 40 26;
+    --warning: 251 191 36;
+    --warning-surface: 45 34 12;
+
+    --status-not-started: 148 158 143;
+    --status-not-started-surface: 27 31 24;
+    --status-not-started-border: 48 55 44;
+
+    --status-in-progress: 96 165 250;
+    --status-in-progress-surface: 20 28 42;
+    --status-in-progress-border: 38 57 88;
+
+    --status-paused: 248 113 113;
+    --status-paused-surface: 42 22 22;
+    --status-paused-border: 82 38 38;
+
+    --status-in-review: 251 191 36;
+    --status-in-review-surface: 40 31 13;
+    --status-in-review-border: 82 61 22;
+
+    --status-production: 74 222 128;
+    --status-production-surface: 18 38 25;
+    --status-production-border: 34 70 45;
+
+    --sidebar-bg: 21 26 17;
+    --sidebar-text: 197 208 187;
+    --sidebar-text-muted: 143 155 133;
+    --sidebar-active-bg: 183 233 58;
+    --sidebar-active-text: 24 34 10;
+    --sidebar-hover-bg: 36 43 29;
+    --sidebar-hover-text: 198 239 94;
+    --sidebar-border: 46 55 37;
+    --sidebar-panel-accent: 183 233 58;
+
+    --dot-wave-dot: 197 208 187;
+    --dot-wave-glow: 163 217 28;
+
+    --ring: 183 233 58;
+    --enhancement-bg: 183 233 58;
+    --enhancement-bg-2: 163 217 28;
+    --enhancement-fg: 20 28 8;
+    --enhancement-ring: 217 245 153;
+    --chart-arrivals: 59 130 246;
+    --chart-deliveries: 118 163 18;
+    --assistant-bg: 40 56 18;
+    --assistant-bg-2: 24 33 12;
+    --assistant-fg: 217 245 153;
+    --assistant-edge: 52 70 24;
+    --assistant-comet: 183 233 58;
+    --assistant-glow: 133 180 18;
+    --shadow-color: 0 0 0;
+
+    color-scheme: dark;
+  }
+
+  * {
+    border-color: rgb(var(--border));
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  /*
+   * Colour transition on the theme switch only.
+   *
+   * The properties are named explicitly instead of using `transition: all`: a blanket
+   * transition on every element would also animate layout-affecting properties during
+   * drag and drop, where the card must track the pointer exactly.
+   */
+  body,
+  body *:not(svg):not(path) {
+    transition-property: background-color, border-color, color, fill;
+    transition-duration: 180ms;
+    transition-timing-function: cubic-bezier(0.22, 0.61, 0.36, 1);
+  }
+
+  body {
+    @apply bg-canvas text-body antialiased;
+    font-family:
+      'Plus Jakarta Sans',
+      ui-sans-serif,
+      system-ui,
+      -apple-system,
+      'Segoe UI',
+      sans-serif;
+    font-feature-settings: 'cv11', 'ss01';
+    min-height: 100vh;
+  }
+
+  /* One consistent focus treatment, visible on every surface including the lime sidebar. */
+  :focus-visible {
+    outline: 2px solid rgb(var(--ring));
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  /* Respect the OS setting; motion is only ever confirmation, never decoration. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-delay: 0ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer components {
+  .card-surface {
+    @apply rounded-xl border border-line bg-surface;
+  }
+
+  /* Columns scroll independently; the board itself scrolls horizontally. */
+  .scroll-slim {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(var(--border-strong)) transparent;
+  }
+  .scroll-slim::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .scroll-slim::-webkit-scrollbar-thumb {
+    background-color: rgb(var(--border-strong));
+    border-radius: 999px;
+  }
+  .scroll-slim::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+@layer utilities {
+  /*
+   * Staggered entrance.
+   *
+   * A list appearing all at once reads as a flash; the same list appearing over ~200ms
+   * reads as the interface drawing itself. Each item sets `--i` and inherits the delay,
+   * capped so a long board never keeps the user waiting on the last card.
+   */
+  .stagger > * {
+    animation: rise-in 320ms cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
+    animation-delay: calc(var(--i, 0) * 45ms);
+  }
+
+  .stagger-tight > * {
+    animation: rise-in 260ms cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
+    animation-delay: calc(var(--i, 0) * 28ms);
+  }
+
+  /* Hover elevation, applied to anything that opens or navigates on click. */
+  .lift {
+    @apply transition-all duration-200 ease-smooth;
+  }
+  .lift:hover {
+    @apply -translate-y-0.5 shadow-lifted;
+  }
+  .lift:active {
+    @apply translate-y-0 shadow-card;
+  }
+
+  /* Tactile press. The scale is small enough to feel like a button and not a toy. */
+  .press {
+    @apply active:scale-[0.97];
+  }
+
+  .shimmer {
+    background-image: linear-gradient(
+      90deg,
+      rgb(var(--surface-muted)) 0%,
+      rgb(var(--border)) 50%,
+      rgb(var(--surface-muted)) 100%
+    );
+    background-size: 200% 100%;
+    @apply animate-shimmer;
+  }
+
+  /*
+   * Faint dot field used on the brand panel. It gives the flat lime some depth at close
+   * range without introducing a second colour or an image asset.
+   */
+  .dot-field {
+    background-image: radial-gradient(rgb(var(--sidebar-text) / 0.14) 1px, transparent 1px);
+    background-size: 22px 22px;
+  }
+
+  /*
+   * A dot grid for the login screen's hero panel, with a soft band sweeping diagonally
+   * through it on a loop. Both layers share the exact same grid, so the sweep reads as
+   * the dots themselves lighting up in sequence rather than as a light moving over an
+   * unrelated pattern. `mask-position` is animated instead of the dots' own colour: the
+   * grid is one background-image, redrawing it per dot to fade each one individually
+   * would be far more CSS for the same result.
+   *
+   * `--dot-wave-dot`/`--dot-wave-glow` are the one part of this that genuinely inverts
+   * between themes rather than just changing tone: on the light theme's solid lime
+   * panel both layers are white, since a green dot would vanish into a green fill;
+   * on the dark theme's near-black panel the sweep is the brand green again.
+   */
+  .dot-wave {
+    background-image: radial-gradient(rgb(var(--dot-wave-dot) / 0.3) 1px, transparent 1px);
+    background-size: 22px 22px;
+  }
+  .dot-wave::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(rgb(var(--dot-wave-glow)) 1px, transparent 1px);
+    background-size: 22px 22px;
+    -webkit-mask-image: linear-gradient(
+      115deg,
+      transparent 0%,
+      transparent 40%,
+      black 50%,
+      transparent 60%,
+      transparent 100%
+    );
+    mask-image: linear-gradient(
+      115deg,
+      transparent 0%,
+      transparent 40%,
+      black 50%,
+      transparent 60%,
+      transparent 100%
+    );
+    -webkit-mask-size: 260% 260%;
+    mask-size: 260% 260%;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    animation: dot-wave-sweep 8s ease-in-out infinite;
+  }
+}
+
+/*
+ * Not Tailwind-managed (unlike the keyframes in tailwind.config.ts): this one animates
+ * `mask-position`, a property Tailwind's `animation` utilities have no vocabulary for,
+ * so it is only reachable from plain CSS.
+ */
+@keyframes dot-wave-sweep {
+  0% {
+    -webkit-mask-position: -20% -20%;
+    mask-position: -20% -20%;
+  }
+  50% {
+    -webkit-mask-position: 120% 120%;
+    mask-position: 120% 120%;
+  }
+  100% {
+    -webkit-mask-position: -20% -20%;
+    mask-position: -20% -20%;
+  }
+}
+
+@layer components {
+  /*
+   * Rendered rich text.
+   *
+   * Deliberately hand-written rather than a typography plugin: the description is the
+   * only rich text in the product, it lives in a narrow panel, and a plugin would ship
+   * a stylesheet for a dozen elements this app never produces.
+   */
+  .prose-demand {
+    @apply text-sm leading-relaxed text-muted;
+  }
+  .prose-demand > * + * {
+    @apply mt-2.5;
+  }
+  .prose-demand p {
+    @apply leading-relaxed;
+  }
+  .prose-demand strong,
+  .prose-demand b {
+    @apply font-bold text-body;
+  }
+  .prose-demand em,
+  .prose-demand i {
+    @apply italic;
+  }
+  .prose-demand u {
+    @apply underline underline-offset-2;
+  }
+  .prose-demand s {
+    @apply line-through opacity-70;
+  }
+  .prose-demand h2 {
+    @apply text-base font-bold text-body;
+  }
+  .prose-demand h3 {
+    @apply text-sm font-bold text-body;
+  }
+  .prose-demand ul {
+    @apply list-disc space-y-1 pl-5;
+  }
+  .prose-demand ol {
+    @apply list-decimal space-y-1 pl-5;
+  }
+  .prose-demand li {
+    @apply pl-0.5;
+  }
+  .prose-demand blockquote {
+    @apply border-l-2 border-brand-400 pl-3 italic;
+  }
+  .prose-demand code {
+    @apply rounded bg-surface-muted px-1 py-0.5 font-mono text-xs text-body;
+  }
+  .prose-demand pre {
+    @apply overflow-x-auto rounded-lg bg-surface-muted p-3 font-mono text-xs text-body;
+  }
+  .prose-demand pre code {
+    @apply bg-transparent p-0;
+  }
+  .prose-demand a {
+    @apply font-medium text-brand-700 underline underline-offset-2 hover:text-brand-800;
+  }
+
+  /*
+   * Long-form documentation, rendered from the project's own `docs/*.md` files (see
+   * lib/markdown.ts). A wider measure and a fuller heading scale than `.prose-demand`
+   * on purpose — this is a document meant to be read start to finish, not a two-line
+   * description sitting beside a form field.
+   */
+  .prose-docs {
+    @apply max-w-[46rem] text-[0.9375rem] leading-relaxed text-body;
+  }
+  .prose-docs > * + * {
+    @apply mt-4;
+  }
+  .prose-docs h1 {
+    @apply text-2xl font-extrabold tracking-tight text-body;
+  }
+  .prose-docs h2 {
+    @apply mt-10 scroll-mt-6 border-t border-line pt-8 text-xl font-bold text-body first:mt-0 first:border-0 first:pt-0;
+  }
+  .prose-docs h3 {
+    @apply mt-6 scroll-mt-6 text-base font-bold text-body;
+  }
+  .prose-docs strong {
+    @apply font-bold text-body;
+  }
+  .prose-docs em {
+    @apply italic;
+  }
+  .prose-docs ul {
+    @apply list-disc space-y-1.5 pl-5;
+  }
+  .prose-docs ol {
+    @apply list-decimal space-y-1.5 pl-5;
+  }
+  .prose-docs li {
+    @apply pl-0.5;
+  }
+  .prose-docs hr {
+    @apply my-8 border-line;
+  }
+  .prose-docs blockquote {
+    @apply border-l-2 border-brand-400 bg-brand-50 py-2 pl-4 text-muted;
+  }
+  .prose-docs code {
+    @apply rounded bg-surface-muted px-1.5 py-0.5 font-mono text-[0.8125rem] text-body;
+  }
+  .prose-docs pre {
+    @apply overflow-x-auto rounded-lg border border-line bg-surface-muted p-3.5 font-mono text-[0.8125rem] leading-relaxed text-body;
+  }
+  .prose-docs pre code {
+    @apply bg-transparent p-0;
+  }
+  .prose-docs a {
+    @apply font-medium text-brand-700 underline underline-offset-2 hover:text-brand-800;
+  }
+  .prose-docs .table-wrap {
+    @apply overflow-x-auto rounded-lg border border-line;
+  }
+  .prose-docs table {
+    @apply w-full min-w-[28rem] border-collapse text-left text-sm;
+  }
+  .prose-docs th {
+    @apply whitespace-nowrap border-b border-line bg-surface-muted px-3 py-2 font-semibold text-subtle;
+  }
+  .prose-docs td {
+    @apply border-b border-line px-3 py-2 align-top last:w-full;
+  }
+  .prose-docs tr:last-child td {
+    @apply border-0;
+  }
+  /* Mermaid diagrams: centered, and never wider than the reading column. */
+  .prose-docs .mermaid {
+    @apply flex justify-center overflow-x-auto;
+  }
+  .prose-docs .mermaid svg {
+    @apply max-w-full;
+  }
+
+  /*
+   * Quill, re-skinned.
+   *
+   * The snow theme hardcodes greys and a white background, which reads as a hole in the
+   * page under the dark theme. Every colour here resolves to the same tokens as the rest
+   * of the application, so the editor follows the theme switch like any other surface.
+   */
+  .quill-host .ql-toolbar.ql-snow {
+    @apply border-0 border-b border-line bg-surface-muted px-2 py-1.5;
+  }
+  .quill-host .ql-container.ql-snow {
+    @apply border-0 bg-surface font-sans text-sm text-body;
+  }
+  .quill-host .ql-editor {
+    min-height: var(--quill-min-height, 10rem);
+    @apply px-3 py-2.5 leading-relaxed;
+  }
+  .quill-host .ql-editor.ql-blank::before {
+    @apply not-italic text-subtle;
+    left: 0.75rem;
+    right: 0.75rem;
+  }
+  .quill-host .ql-snow .ql-stroke {
+    stroke: rgb(var(--text-muted));
+  }
+  .quill-host .ql-snow .ql-fill {
+    fill: rgb(var(--text-muted));
+  }
+  .quill-host .ql-snow .ql-picker {
+    color: rgb(var(--text-muted));
+  }
+  .quill-host .ql-snow button:hover .ql-stroke,
+  .quill-host .ql-snow button.ql-active .ql-stroke,
+  .quill-host .ql-snow .ql-picker-label:hover .ql-stroke {
+    stroke: rgb(var(--brand-700));
+  }
+  .quill-host .ql-snow button:hover .ql-fill,
+  .quill-host .ql-snow button.ql-active .ql-fill {
+    fill: rgb(var(--brand-700));
+  }
+  .quill-host .ql-snow button.ql-active {
+    @apply rounded bg-brand-100;
+  }
+  /* The picker dropdown is a floating surface and needs the token background too. */
+  .quill-host .ql-snow .ql-picker-options {
+    @apply rounded-lg border border-line bg-surface shadow-lifted;
+  }
+  .quill-host .ql-snow .ql-picker-item {
+    color: rgb(var(--text));
+  }
+  .quill-host .ql-snow .ql-tooltip {
+    @apply rounded-lg border border-line bg-surface text-body shadow-lifted;
+    color: rgb(var(--text));
+  }
+  .quill-host .ql-snow .ql-tooltip input[type='text'] {
+    @apply rounded border border-line bg-surface px-2 py-1 text-sm text-body;
+  }
+  .quill-host .ql-editor a {
+    @apply text-brand-700 underline;
+  }
+  .quill-host .ql-editor blockquote {
+    @apply border-l-2 border-brand-400 pl-3 italic;
+  }
+  .quill-host .ql-editor pre.ql-syntax {
+    @apply rounded-lg bg-surface-muted p-3 font-mono text-xs text-body;
+  }
+}
+
+@layer components {
+  /*
+   * "Melhoria" — marks a module that is not in the original specification.
+   *
+   * Loud by request, but not noisy: a solid pill in the brand's own colours, a sparkle, and
+   * one sheen that crosses it once when it appears and again when its row is hovered. It
+   * never loops — a badge that keeps moving competes with the content it labels.
+   */
+  .enhancement-badge {
+    position: relative;
+    overflow: hidden;
+    background-image: linear-gradient(
+      135deg,
+      rgb(var(--enhancement-bg)) 0%,
+      rgb(var(--enhancement-bg-2)) 100%
+    );
+    color: rgb(var(--enhancement-fg));
+    box-shadow:
+      inset 0 0 0 1px rgb(var(--enhancement-ring) / 0.35),
+      0 1px 2px rgb(var(--shadow-color) / 0.25);
+  }
+  .enhancement-badge::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: linear-gradient(
+      110deg,
+      transparent 30%,
+      rgb(255 255 255 / 0.45) 50%,
+      transparent 70%
+    );
+    transform: translateX(-130%);
+    animation: enhancement-sheen 1100ms cubic-bezier(0.22, 0.61, 0.36, 1) 400ms 1 both;
+    pointer-events: none;
+  }
+  .group:hover .enhancement-badge::after,
+  .group:focus-visible .enhancement-badge::after {
+    animation: enhancement-sheen-hover 900ms cubic-bezier(0.22, 0.61, 0.36, 1) 1 both;
+  }
+
+  @keyframes enhancement-sheen {
+    from {
+      transform: translateX(-130%);
+    }
+    to {
+      transform: translateX(130%);
+    }
+  }
+  /*
+   * "Ação rápida" — the one control on the board that moves on its own, by request.
+   *
+   * A comet of lime light travels around the pill's rim: a conic gradient spins behind a
+   * face inset by 2px, so only the edge ever shows it. The sparkle glints every few
+   * seconds, and hovering speeds the comet up. Everything is slow enough to read as
+   * "available" rather than "alarm", and the reduced-motion rule above stills it all.
+   */
+  .quick-action {
+    position: relative;
+    isolation: isolate;
+    display: inline-flex;
+    flex-shrink: 0;
+    height: 2.5rem;
+    overflow: hidden;
+    border-radius: 0.75rem;
+    padding: 2px;
+    background-color: rgb(var(--assistant-edge));
+    box-shadow: 0 6px 18px -8px rgb(var(--assistant-glow) / 0.75);
+    transition:
+      transform 200ms cubic-bezier(0.22, 0.61, 0.36, 1),
+      box-shadow 200ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  }
+  .quick-action:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 12px 28px -10px rgb(var(--assistant-glow) / 0.95);
+  }
+  .quick-action:active {
+    transform: scale(0.97);
+  }
+  .quick-action::before,
+  .assistant-orb::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    z-index: -1;
+    /* A square wider than the pill's diagonal, so the spin never uncovers a corner. */
+    width: max(200%, 12rem);
+    aspect-ratio: 1;
+    background-image: conic-gradient(
+      from 0deg,
+      transparent 0deg 210deg,
+      rgb(var(--assistant-comet) / 0.25) 265deg,
+      rgb(var(--assistant-comet)) 330deg,
+      rgb(255 255 255 / 0.95) 350deg,
+      transparent 360deg
+    );
+    transform: translate(-50%, -50%) rotate(0deg);
+    animation: assistant-orbit 3.6s linear infinite;
+  }
+  .quick-action:hover::before {
+    animation-duration: 1.6s;
+  }
+  .quick-action__face {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    height: 100%;
+    overflow: hidden;
+    border-radius: calc(0.75rem - 2px);
+    padding-inline: 0.875rem;
+    background-image: linear-gradient(
+      135deg,
+      rgb(var(--assistant-bg)) 0%,
+      rgb(var(--assistant-bg-2)) 100%
+    );
+    color: rgb(var(--assistant-fg));
+    font-size: 0.8125rem;
+    font-weight: 700;
+    line-height: 1;
+  }
+  /* The same single sheen as the "Melhoria" badge: once on arrival, again on hover. */
+  .quick-action__face::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: linear-gradient(
+      110deg,
+      transparent 30%,
+      rgb(255 255 255 / 0.28) 50%,
+      transparent 70%
+    );
+    transform: translateX(-130%);
+    animation: enhancement-sheen 1100ms cubic-bezier(0.22, 0.61, 0.36, 1) 500ms 1 both;
+    pointer-events: none;
+  }
+  .quick-action:hover .quick-action__face::after {
+    animation: enhancement-sheen-hover 900ms cubic-bezier(0.22, 0.61, 0.36, 1) 1 both;
+  }
+  .quick-action__icon {
+    animation: assistant-glint 4.2s ease-in-out infinite;
+  }
+  .quick-action__kbd {
+    align-items: center;
+    border-radius: 0.375rem;
+    padding: 0.1875rem 0.375rem;
+    font-family: inherit;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    background-color: rgb(var(--assistant-fg) / 0.14);
+    color: rgb(var(--assistant-fg) / 0.8);
+  }
+
+  /* The assistant at work: the button's comet, closed into a ring. */
+  .assistant-orb {
+    position: relative;
+    isolation: isolate;
+    display: flex;
+    height: 4rem;
+    width: 4rem;
+    overflow: hidden;
+    border-radius: 9999px;
+    padding: 3px;
+    background-color: rgb(var(--assistant-edge));
+    box-shadow: 0 12px 32px -12px rgb(var(--assistant-glow) / 0.9);
+  }
+  .assistant-orb::before {
+    animation-duration: 1.3s;
+  }
+  .assistant-orb__face {
+    display: flex;
+    height: 100%;
+    width: 100%;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9999px;
+    background-image: linear-gradient(
+      135deg,
+      rgb(var(--assistant-bg)) 0%,
+      rgb(var(--assistant-bg-2)) 100%
+    );
+    color: rgb(var(--assistant-fg));
+  }
+  .assistant-orb__face svg {
+    animation: assistant-glint 1.6s ease-in-out infinite;
+  }
+
+  .assistant-hero {
+    background-image:
+      radial-gradient(120% 90% at 100% 0%, rgb(var(--assistant-comet) / 0.22) 0%, transparent 55%),
+      linear-gradient(135deg, rgb(var(--assistant-bg)) 0%, rgb(var(--assistant-bg-2)) 100%);
+    color: rgb(var(--assistant-fg));
+  }
+
+  /* A written answer: the demand prose, a size up and in full ink, with quiet links. */
+  .prose-assistant {
+    @apply text-[0.875rem] text-body;
+  }
+  .prose-assistant h3 {
+    @apply mt-5 text-sm font-bold text-body first:mt-0;
+  }
+  .prose-assistant a {
+    @apply font-semibold text-brand-700 no-underline hover:underline;
+  }
+
+  @keyframes assistant-orbit {
+    to {
+      transform: translate(-50%, -50%) rotate(360deg);
+    }
+  }
+  @keyframes assistant-glint {
+    0%,
+    72%,
+    100% {
+      transform: scale(1) rotate(0deg);
+    }
+    80% {
+      transform: scale(1.3) rotate(18deg);
+    }
+    88% {
+      transform: scale(0.92) rotate(-6deg);
+    }
+  }
+
+  /* A second, identical keyframe: switching animation-name is what restarts it on hover. */
+  @keyframes enhancement-sheen-hover {
+    from {
+      transform: translateX(-130%);
+    }
+    to {
+      transform: translateX(130%);
+    }
+  }
+}

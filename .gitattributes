@@ -1,0 +1,17 @@
+# Normalize line endings in the repository; check out with the platform's default.
+* text=auto
+
+# Shell scripts run inside Linux containers: a CRLF checkout on Windows breaks the
+# shebang ("/bin/sh^M: not found") and the API container would never start.
+*.sh text eol=lf
+Dockerfile text eol=lf
+
+# Binary assets
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary

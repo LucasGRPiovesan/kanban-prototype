@@ -1,0 +1,123 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: kanban-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: kanban
+      MYSQL_USER: kanban
+      MYSQL_PASSWORD: kanban
+    ports:
+      - '3306:3306'
+    volumes:
+      - mysql-data:/var/lib/mysql
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      # The API waits on this: migrations against a half-started MySQL fail in
+      # confusing ways, so the dependency is on health, not on the container existing.
+      #
+      # The window is deliberately generous. On a first run MySQL initializes its data
+      # directory, which can take several minutes on a slow disk or a bind-mounted
+      # volume; failures during start_period do not count against `retries`, so this
+      # waits patiently on first boot while still failing fast once the volume exists.
+      #
+      # `--protocol=TCP` is essential and not a detail: during initialization the MySQL
+      # entrypoint runs a temporary server that listens on the Unix socket only. A ping
+      # over the socket therefore succeeds while the real, networked server does not yet
+      # exist and the `kanban` user has not been created — the API then starts and fails
+      # with "Host is not allowed to connect". Forcing TCP makes the check mean what the
+      # API actually needs.
+      test:
+        ['CMD', 'mysqladmin', 'ping', '--protocol=TCP', '-h', '127.0.0.1', '-ukanban', '-pkanban']
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 480s
+
+  # Startup is a strict sequence, each step gated on the previous one actually being ready:
+  #   mysql (healthy) → migrate (completed) → api (healthy) → web
+  # Before, migrations, the seed and the API server all ran inside the api container while
+  # the web container started in parallel, so their logs interleaved and the frontend could
+  # come up against an API that was still migrating.
+
+  # One-shot: applies migrations and runs the idempotent seed, then exits. Same image as the
+  # API, so the schema and the code that expects it always ship together.
+  migrate:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: kanban-api:local
+    container_name: kanban-migrate
+    command: ['migrate']
+    restart: 'no'
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment: &api-environment
+      NODE_ENV: production
+      PORT: 3333
+      DATABASE_URL: mysql://kanban:kanban@mysql:3306/kanban
+      # Local-only secret. Any real deployment sets its own (see docs/DEPLOY.md).
+      JWT_SECRET: ${JWT_SECRET:-desenvolvimento-local-troque-este-segredo-em-producao}
+      JWT_EXPIRES_IN: 12h
+      AUTH_COOKIE_NAME: kanban_session
+      CORS_ORIGIN: http://localhost:8080,http://localhost:5173
+      STORAGE_DRIVER: local
+      STORAGE_LOCAL_DIR: /app/storage
+      STORAGE_PUBLIC_BASE_URL: http://localhost:3333/files
+      UPLOAD_MAX_FILE_SIZE_MB: 10
+      UPLOAD_MAX_FILES_PER_REQUEST: 10
+      # Optional evaluation key for the AI assistant, read by the seed on a fresh database.
+      # Kept out of the repository: define it in a root .env file (see .env.example).
+      SEED_ASSISTANT_API_KEY: ${SEED_ASSISTANT_API_KEY:-}
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: kanban-api:local
+    container_name: kanban-api
+    restart: unless-stopped
+    # Proper PID 1: forwards SIGTERM so the graceful shutdown in server.ts actually runs.
+    init: true
+    depends_on:
+      mysql:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment: *api-environment
+    ports:
+      - '3333:3333'
+    volumes:
+      - api-storage:/app/storage
+    healthcheck:
+      test: ['CMD', 'node', '-e', "require('http').get('http://localhost:3333/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+  web:
+    build:
+      # The repository root, not ./frontend: the image also needs docs/ and
+      # README.md, which the in-app Documentação module renders — see
+      # frontend/Dockerfile and docs/ADDED_REQUIREMENTS.md#37.
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        # Baked at build time: Vite inlines env vars into the bundle.
+        VITE_API_BASE_URL: http://localhost:3333/api/v1
+    container_name: kanban-web
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - '8080:80'
+
+volumes:
+  mysql-data:
+  api-storage:

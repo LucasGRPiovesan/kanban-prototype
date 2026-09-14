@@ -1,0 +1,413 @@
+// Persistence model.
+// NOTE: These are NOT domain entities. Mappers in each module's
+// infrastructure layer translate Prisma models <-> domain entities.
+//
+// Identifier strategy (see docs/DATABASE.md):
+//   `id`   BIGINT UNSIGNED AUTO_INCREMENT — internal only, never crosses the API boundary.
+//   `uuid` CHAR(36) UUID v7 — the only public identifier.
+// The two are fully independent; uuid is never derived from id.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Role {
+  id        BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  uuid      String   @unique(map: "uq_roles_uuid") @db.Char(36)
+  name      String   @db.VarChar(120)
+  slug      String   @unique(map: "uq_roles_slug") @db.VarChar(60)
+  isSystem  Boolean  @default(false) @map("is_system")
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+
+  users       User[]
+  permissions RolePermission[]
+
+  @@index([active, name], map: "ix_roles_active_name")
+  @@map("roles")
+}
+
+model Permission {
+  id          BigInt @id @default(autoincrement()) @db.UnsignedBigInt
+  code        String @unique(map: "uq_permissions_code") @db.VarChar(60)
+  module      String @db.VarChar(40)
+  action      String @db.VarChar(40)
+  description String @db.VarChar(255)
+
+  roles RolePermission[]
+
+  @@index([module, action], map: "ix_permissions_module_action")
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       BigInt   @map("role_id") @db.UnsignedBigInt
+  permissionId BigInt   @map("permission_id") @db.UnsignedBigInt
+  createdAt    DateTime @default(now()) @map("created_at") @db.DateTime(3)
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@index([permissionId, roleId], map: "ix_role_permissions_permission_role")
+  @@map("role_permissions")
+}
+
+model User {
+  id        BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  uuid      String   @unique(map: "uq_users_uuid") @db.Char(36)
+  name      String   @db.VarChar(160)
+  /// Absolute URL of a profile picture. Optional: the UI falls back to the monogram
+  /// whenever it is absent *or* the image fails to load, so this is a decoration and
+  /// never something the interface depends on.
+  avatarUrl String?  @map("avatar_url") @db.VarChar(500)
+  roleId    BigInt   @map("role_id") @db.UnsignedBigInt
+  active    Boolean  @default(true)
+  /// Soft-delete marker, independent of `active`: excluding a user always deactivates it,
+  /// but not every deactivation is an exclusion — this is what tells the two apart, so
+  /// the UI can dim an excluded row and offer "reverter exclusão" instead of the plain
+  /// reactivate toggle. `null` means never excluded.
+  deletedAt DateTime? @map("deleted_at") @db.DateTime(3)
+  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+
+  role                Role               @relation(fields: [roleId], references: [id])
+  memberships         ProjectMember[]
+  createdProjects     Project[]          @relation("ProjectCreatedBy")
+  assignedDemands     Demand[]           @relation("DemandResponsible")
+  createdDemands      Demand[]           @relation("DemandCreatedBy")
+  uploadedAttachments DemandAttachment[] @relation("AttachmentCreatedBy")
+  comments            DemandComment[]    @relation("CommentAuthor")
+  issuedCredentials   ProjectIntegrationCredential[] @relation("IntegrationCredentialCreatedBy")
+  assistantSettings   AssistantSettings[]            @relation("AssistantSettingsUpdatedBy")
+  watchedDemands      DemandWatcher[]
+  notifications       Notification[]
+
+  @@index([roleId, active, name], map: "ix_users_role_active_name")
+  @@index([active, name], map: "ix_users_active_name")
+  @@map("users")
+}
+
+model Project {
+  id              BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  uuid            String   @unique(map: "uq_projects_uuid") @db.Char(36)
+  name            String   @db.VarChar(160)
+  description     String   @db.VarChar(500)
+  active          Boolean  @default(true)
+  createdByUserId BigInt   @map("created_by_user_id") @db.UnsignedBigInt
+  createdAt       DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+
+  createdBy   User                           @relation("ProjectCreatedBy", fields: [createdByUserId], references: [id])
+  members     ProjectMember[]
+  demands     Demand[]
+  integration ProjectIntegrationCredential?
+
+  @@index([active, name], map: "ix_projects_active_name")
+  @@index([createdByUserId], map: "ix_projects_created_by")
+  @@map("projects")
+}
+
+/// Pure N:N link between User and Project.
+/// Intentionally carries NO role: authority is global (Role), locality is membership.
+model ProjectMember {
+  projectId BigInt   @map("project_id") @db.UnsignedBigInt
+  userId    BigInt   @map("user_id") @db.UnsignedBigInt
+  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(3)
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, userId])
+  @@index([userId, projectId], map: "ix_project_members_user_project")
+  @@map("project_members")
+}
+
+enum DemandStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  PAUSED
+  IN_REVIEW
+  PRODUCTION
+}
+
+enum DemandPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+model Demand {
+  id                BigInt         @id @default(autoincrement()) @db.UnsignedBigInt
+  uuid              String         @unique(map: "uq_demands_uuid") @db.Char(36)
+  /// Optional: a demand may exist before anyone decides where it belongs. A demand with
+  /// no project is not scoped by allocation, so its visibility follows the responsible
+  /// (and DEMAND_VIEW_ALL) instead — see ProjectAccessPolicy and DemandListFilter.
+  projectId         BigInt?        @map("project_id") @db.UnsignedBigInt
+  title             String         @db.VarChar(180)
+  description       String         @db.Text
+  dueDate           DateTime       @map("due_date") @db.Date
+  status            DemandStatus
+  priority          DemandPriority @default(MEDIUM)
+  /// A demand hidden from the board without touching its lifecycle status — orthogonal to
+  /// `status`, the same way `Project.active` sits beside a project's own state.
+  archived          Boolean        @default(false)
+  responsibleUserId BigInt         @map("responsible_user_id") @db.UnsignedBigInt
+  createdByUserId   BigInt         @map("created_by_user_id") @db.UnsignedBigInt
+  createdAt         DateTime       @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt         DateTime       @updatedAt @map("updated_at") @db.DateTime(3)
+
+  project     Project?              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  responsible User                  @relation("DemandResponsible", fields: [responsibleUserId], references: [id])
+  createdBy   User                  @relation("DemandCreatedBy", fields: [createdByUserId], references: [id])
+  attachments DemandAttachment[]
+  checklist   DemandChecklistItem[]
+  comments    DemandComment[]
+  watchers    DemandWatcher[]
+
+  // Primary Kanban access path: demands of a project, grouped by status, ordered by due date.
+  @@index([projectId, status, dueDate], map: "ix_demands_project_status_due")
+  @@index([projectId, archived, dueDate], map: "ix_demands_project_archived_due")
+  @@index([responsibleUserId], map: "ix_demands_responsible")
+  @@index([createdByUserId], map: "ix_demands_created_by")
+  @@map("demands")
+}
+
+/// An item on a demand's checklist.
+///
+/// Part of the Demand aggregate, not an entity of its own: an item has no meaning
+/// outside its demand, is never addressed without one, and disappears with it — which
+/// is why the FK cascades and why every write goes through the aggregate root.
+model DemandChecklistItem {
+  id        BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  uuid      String   @unique(map: "uq_demand_checklist_items_uuid") @db.Char(36)
+  demandId  BigInt   @map("demand_id") @db.UnsignedBigInt
+  title     String   @db.VarChar(240)
+  done      Boolean  @default(false)
+  /// Explicit ordering: insertion order is not a contract, and the operator decides
+  /// what comes first. Gaps are allowed so a reorder need not rewrite every row.
+  position  Int      @db.UnsignedSmallInt
+  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+
+  demand Demand @relation(fields: [demandId], references: [id], onDelete: Cascade)
+
+  // The only access path: every item of one demand, already in display order.
+  @@index([demandId, position], map: "ix_demand_checklist_demand_position")
+  @@map("demand_checklist_items")
+}
+
+model DemandAttachment {
+  id              BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  uuid            String   @unique(map: "uq_demand_attachments_uuid") @db.Char(36)
+  demandId        BigInt   @map("demand_id") @db.UnsignedBigInt
+  originalName    String   @map("original_name") @db.VarChar(255)
+  mimeType        String   @map("mime_type") @db.VarChar(120)
+  sizeBytes       Int      @map("size_bytes") @db.UnsignedInt
+  storageKey      String   @map("storage_key") @db.VarChar(400)
+  thumbnailKey    String?  @map("thumbnail_key") @db.VarChar(400)
+  createdByUserId BigInt   @map("created_by_user_id") @db.UnsignedBigInt
+  createdAt       DateTime @default(now()) @map("created_at") @db.DateTime(3)
+
+  demand    Demand @relation(fields: [demandId], references: [id], onDelete: Cascade)
+  createdBy User   @relation("AttachmentCreatedBy", fields: [createdByUserId], references: [id])
+
+  @@index([demandId, createdAt], map: "ix_demand_attachments_demand_created")
+  @@map("demand_attachments")
+}
+
+/// A comment on a demand.
+///
+/// Its own aggregate, not part of Demand: a conversation is unbounded, written by many
+/// people concurrently, and never needs the demand's invariants to be checked — loading
+/// the demand and every comment to append one line would be the wrong trade-off.
+model DemandComment {
+  id           BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  uuid         String    @unique(map: "uq_demand_comments_uuid") @db.Char(36)
+  demandId     BigInt    @map("demand_id") @db.UnsignedBigInt
+  authorUserId BigInt    @map("author_user_id") @db.UnsignedBigInt
+  /// Plain text. Rich text would open a second XSS surface for no requirement.
+  body         String    @db.Text
+  createdAt    DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  editedAt     DateTime? @map("edited_at") @db.DateTime(3)
+
+  demand Demand @relation(fields: [demandId], references: [id], onDelete: Cascade)
+  author User   @relation("CommentAuthor", fields: [authorUserId], references: [id])
+
+  // The thread of one demand, in order.
+  @@index([demandId, createdAt], map: "ix_demand_comments_demand_created")
+  @@index([authorUserId], map: "ix_demand_comments_author")
+  @@map("demand_comments")
+}
+
+/// A person's opt-in to hear about every change on a demand that is not theirs.
+///
+/// Personal, not a property of the demand: two people holding the same DEMAND_WATCH
+/// permission decide independently. The responsible never needs a row here — they are
+/// notified by default. Holding the permission is re-checked whenever a notification is
+/// dispatched, so a revoked permission silences a watch without deleting the preference.
+model DemandWatcher {
+  userId    BigInt   @map("user_id") @db.UnsignedBigInt
+  demandId  BigInt   @map("demand_id") @db.UnsignedBigInt
+  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(3)
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  demand Demand @relation(fields: [demandId], references: [id], onDelete: Cascade)
+
+  @@id([userId, demandId])
+  @@index([demandId, userId], map: "ix_demand_watchers_demand_user")
+  @@map("demand_watchers")
+}
+
+/// One person's inbox entry about one change on a demand.
+///
+/// One row per recipient, so "seen" is individual: two administrators and a developer
+/// notified of the same change each clear it on their own. The demand is referenced by a
+/// snapshot (uuid, title, project name) rather than a foreign key, the same posture as
+/// `logs` — a notification that a demand was deleted must outlive the demand.
+model Notification {
+  id              BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  uuid            String    @unique(map: "uq_notifications_uuid") @db.Char(36)
+  recipientUserId BigInt    @map("recipient_user_id") @db.UnsignedBigInt
+  /// Why this person hears about it: RESPONSIBLE (by default) or WATCHER (opted in).
+  reason          String    @db.VarChar(20)
+  action          String    @db.VarChar(64)
+  summary         String    @db.VarChar(500)
+  demandUuid      String    @map("demand_uuid") @db.Char(36)
+  demandTitle     String    @map("demand_title") @db.VarChar(200)
+  projectName     String?   @map("project_name") @db.VarChar(160)
+  actorUuid       String?   @map("actor_uuid") @db.Char(36)
+  actorName       String?   @map("actor_name") @db.VarChar(160)
+  changes         Json?
+  readAt          DateTime? @map("read_at") @db.DateTime(3)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+
+  recipient User @relation(fields: [recipientUserId], references: [id], onDelete: Cascade)
+
+  // The inbox, newest first, and the unread badge — both read by recipient.
+  @@index([recipientUserId, createdAt], map: "ix_notifications_recipient_created")
+  @@index([recipientUserId, readAt], map: "ix_notifications_recipient_read")
+  @@map("notifications")
+}
+
+/// Machine-to-machine credential for the demand-integration API — one per project.
+///
+/// No FK-visible secret: `secretHash` is a salted scrypt hash, verified but never
+/// reversed, the same posture a password column would need if this system had one.
+/// `secretPreview` keeps only the secret's last 4 characters, purely so the owner can
+/// recognize which credential is active without the API ever returning the full value
+/// again after the moment it was generated.
+///
+/// Regenerating replaces this row's `uuid` (not just its secret): the integration access
+/// token embeds that `uuid`, so rotating invalidates every token issued under the old
+/// one without needing a revocation list.
+model ProjectIntegrationCredential {
+  id              BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  uuid            String    @unique(map: "uq_project_integration_uuid") @db.Char(36)
+  projectId       BigInt    @unique(map: "uq_project_integration_project") @map("project_id") @db.UnsignedBigInt
+  apiKey          String    @unique(map: "uq_project_integration_api_key") @map("api_key") @db.VarChar(64)
+  secretHash      String    @map("secret_hash") @db.VarChar(255)
+  secretPreview   String    @map("secret_preview") @db.VarChar(8)
+  createdByUserId BigInt    @map("created_by_user_id") @db.UnsignedBigInt
+  createdAt       DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  rotatedAt       DateTime? @map("rotated_at") @db.DateTime(3)
+
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy User    @relation("IntegrationCredentialCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+
+  @@map("project_integration_credentials")
+}
+
+enum LogCategory {
+  ACTIVITY
+  SYSTEM
+}
+
+enum LogLevel {
+  INFO
+  WARNING
+  ERROR
+}
+
+enum LogSubjectType {
+  DEMAND
+  PROJECT
+  USER
+  ROLE
+  SETTING
+}
+
+/// Every recorded event, business or technical, in one append-only table.
+///
+/// Deliberately WITHOUT foreign keys. A log entry is a statement about the past: it must
+/// survive the deletion of what it describes (a deleted demand keeps its history) and
+/// must not change when the referent changes (a renamed user does not rewrite who did
+/// what). Subjects are referenced by public uuid plus a label snapshot.
+///
+/// Every ordering index ends in (occurred_at, uuid). Pagination is keyset on that pair,
+/// and InnoDB can only walk an index in order if the tie-breaker is part of it — the
+/// implicit primary key would serve, but the internal id may not cross the API.
+model Log {
+  id           BigInt          @id @default(autoincrement()) @db.UnsignedBigInt
+  uuid         String          @unique(map: "uq_logs_uuid") @db.Char(36)
+  occurredAt   DateTime        @map("occurred_at") @db.DateTime(3)
+  category     LogCategory
+  level        LogLevel
+  action       String          @db.VarChar(64)
+  summary      String          @db.VarChar(500)
+  actorUuid    String?         @map("actor_uuid") @db.Char(36)
+  actorName    String?         @map("actor_name") @db.VarChar(160)
+  subjectType  LogSubjectType? @map("subject_type")
+  subjectUuid  String?         @map("subject_uuid") @db.Char(36)
+  subjectLabel String?         @map("subject_label") @db.VarChar(200)
+  projectUuid  String?         @map("project_uuid") @db.Char(36)
+  projectName  String?         @map("project_name") @db.VarChar(160)
+  changes      Json?
+  metadata     Json?
+  requestId    String?         @map("request_id") @db.VarChar(128)
+
+  // Hot path: the history tab of a demand, opened every time a card is.
+  @@index([subjectType, subjectUuid, occurredAt, uuid], map: "ix_logs_subject_time")
+  // The Logs screen's default feed per category, and the retention purge of SYSTEM rows.
+  @@index([category, occurredAt, uuid], map: "ix_logs_category_time")
+  // Activity of the projects a non-global actor can see.
+  @@index([projectUuid, occurredAt, uuid], map: "ix_logs_project_time")
+  // "What did this person do?"
+  @@index([actorUuid, occurredAt, uuid], map: "ix_logs_actor_time")
+  // Incident correlation: from a request id in an error report to everything it did.
+  @@index([requestId], map: "ix_logs_request")
+  @@map("logs")
+}
+
+/// The AI assistant's configuration — one row for the installation, addressed by `scope`.
+///
+/// The provider key has to be presented on every call, so unlike an integration secret it
+/// cannot be hashed: it is stored encrypted (AES-256-GCM, key derived from JWT_SECRET) and
+/// never returned by the API. `apiKeyPreview` keeps its last 4 characters so a manager can
+/// recognise which key is active.
+model AssistantSettings {
+  id               BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  uuid             String   @unique(map: "uq_assistant_settings_uuid") @db.Char(36)
+  scope            String   @unique(map: "uq_assistant_settings_scope") @db.VarChar(20)
+  enabled          Boolean  @default(true)
+  provider         String   @db.VarChar(30)
+  model            String   @db.VarChar(80)
+  apiKeyCiphertext String?  @map("api_key_ciphertext") @db.VarChar(1024)
+  apiKeyPreview    String?  @map("api_key_preview") @db.VarChar(8)
+  updatedByUserId  BigInt?  @map("updated_by_user_id") @db.UnsignedBigInt
+  createdAt        DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+
+  // SetNull: the configuration outlives whoever last touched it.
+  updatedBy User? @relation("AssistantSettingsUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([updatedByUserId], map: "ix_assistant_settings_updated_by")
+  @@map("assistant_settings")
+}

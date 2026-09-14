@@ -1,0 +1,65 @@
+# -----------------------------------------------------------------------------
+# Dependencies and build output
+# -----------------------------------------------------------------------------
+node_modules/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+.vite/
+
+# -----------------------------------------------------------------------------
+# Environment and secrets — only the committed *.example files document them
+# -----------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+
+# -----------------------------------------------------------------------------
+# Runtime data
+# -----------------------------------------------------------------------------
+# Uploaded attachments written by the local storage driver.
+storage/
+# Executive reports exported from the assistant while testing locally.
+relatorio-executivo-*.pdf
+
+# -----------------------------------------------------------------------------
+# Deploy tooling
+# -----------------------------------------------------------------------------
+.vercel/
+
+# -----------------------------------------------------------------------------
+# AI assistants and agent tooling — local to each developer, never part of the product
+# -----------------------------------------------------------------------------
+.agents/
+.claude/
+.cursor/
+.windsurf/
+.codex/
+.gemini/
+.continue/
+.aider*
+.copilot/
+skills/
+skills-lock.json
+CLAUDE.md
+CLAUDE.local.md
+AGENTS.md
+GEMINI.md
+.cursorrules
+.windsurfrules
+.github/copilot-instructions.md
+
+# -----------------------------------------------------------------------------
+# OS / editor noise
+# -----------------------------------------------------------------------------
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json

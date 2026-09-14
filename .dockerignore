@@ -1,0 +1,14 @@
+# Root-level context: the `web` service builds from the repository root now (so its
+# image can also COPY docs/ and README.md — see frontend/Dockerfile and
+# docs/ADDED_REQUIREMENTS.md#37), so this is the ignore file Docker actually reads for
+# that build. The per-package .dockerignore files no longer apply once the context is
+# the root, and are kept only for local tooling that still expects them there.
+**/node_modules
+**/dist
+**/coverage
+**/*.log
+.git
+backend/storage
+**/.env
+**/.env.*
+!**/.env.example
