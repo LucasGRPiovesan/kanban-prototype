@@ -72,25 +72,40 @@ export function useMoveDemand(projectUuid?: string) {
     mutationFn: ({ uuid, status }: { uuid: string; status: DemandStatus }) =>
       demandsApi.move(uuid, status),
 
+    // Optimistic on both readings of the demand: the board's list (the card moves
+    // immediately while dragging) and its detail (the status control on the edit
+    // form and the details panel read from here, not from the list — without this
+    // second write the field looked frozen until the invalidation below refetched it).
     onMutate: async ({ uuid, status }) => {
-      const key = demandKeys.list(projectUuid);
-      await queryClient.cancelQueries({ queryKey: key });
-      const previous = queryClient.getQueryData<Demand[]>(key);
+      const listKey = demandKeys.list(projectUuid);
+      const detailKey = demandKeys.detail(uuid);
+      await Promise.all([
+        queryClient.cancelQueries({ queryKey: listKey }),
+        queryClient.cancelQueries({ queryKey: detailKey }),
+      ]);
+      const previousList = queryClient.getQueryData<Demand[]>(listKey);
+      const previousDetail = queryClient.getQueryData<Demand>(detailKey);
 
-      queryClient.setQueryData<Demand[]>(key, (current) =>
+      queryClient.setQueryData<Demand[]>(listKey, (current) =>
         (current ?? []).map((demand) =>
           demand.uuid === uuid
             ? { ...demand, status, isTerminal: status === 'PRODUCTION' }
             : demand,
         ),
       );
+      queryClient.setQueryData<Demand>(detailKey, (current) =>
+        current ? { ...current, status, isTerminal: status === 'PRODUCTION' } : current,
+      );
 
-      return { previous, key };
+      return { previousList, previousDetail, listKey, detailKey };
     },
 
     onError: (_error, _variables, context) => {
-      if (context?.previous) {
-        queryClient.setQueryData(context.key, context.previous);
+      if (context?.previousList) {
+        queryClient.setQueryData(context.listKey, context.previousList);
+      }
+      if (context?.previousDetail) {
+        queryClient.setQueryData(context.detailKey, context.previousDetail);
       }
     },
 

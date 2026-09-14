@@ -229,6 +229,13 @@ export function KanbanPage() {
 
   const projects = projectsQuery.data ?? [];
   const hasProjects = projects.length > 0;
+  // Right after login neither query has a cached answer yet, and `projectsQuery` alone
+  // decides `hasProjects` — without folding its own `isLoading` in here, the moment
+  // `demandsQuery` settles first reads as "no projects" (hasProjects still false because
+  // its own query just has not answered yet), flashing that message before the real
+  // board appears. A later visit never shows this: `useProjects` keeps its answer for a
+  // minute, so by then it is already cached.
+  const boardLoading = demandsQuery.isLoading || projectsQuery.isLoading;
   // The listing already carries each project's allocation, so showing the team of the
   // one being filtered costs no extra request.
   const selectedProject = projectUuid
@@ -397,7 +404,7 @@ export function KanbanPage() {
           />
         )}
 
-        {!demandsQuery.isLoading && !demandsQuery.isError && !hasProjects && (
+        {!boardLoading && !demandsQuery.isError && !hasProjects && (
           <div className="card-surface">
             <EmptyState
               icon={<FolderKanban className="h-6 w-6" />}
@@ -414,47 +421,49 @@ export function KanbanPage() {
           each already reads "Nenhuma demanda aqui" on its own — and swapping the whole
           board for a "cadastre a primeira demanda" prompt would be telling the wrong
           story, and briefly hide the very columns a person could use to clear the filter.
+
+          While `boardLoading` is true, whether there even are any projects is still
+          unknown — the board/list's own skeleton renders regardless of `hasProjects`, so
+          the loading window never has to guess which empty state it might be heading for.
         */}
-        {!demandsQuery.isError &&
-        hasProjects &&
-        (demandsQuery.data ?? []).length === 0 &&
-        !demandsQuery.isLoading ? (
-          <BoardEmptyState
-            title={archivedView ? 'Nenhuma demanda arquivada' : undefined}
-            description={archivedView ? 'Demandas arquivadas aparecem aqui.' : undefined}
-            action={
-              !archivedView && can('DEMAND_CREATE') ? (
-                <Link to={newDemandHref()} className={buttonClasses('primary', 'md', 'gap-2')}>
-                  <Plus className="h-4 w-4" aria-hidden="true" />
-                  Nova Demanda
-                </Link>
-              ) : undefined
-            }
-          />
-        ) : (
-          hasProjects &&
-          (view === 'kanban' ? (
-            <KanbanBoard
-              demands={filtered}
-              loading={demandsQuery.isLoading}
-              canAddCard={!archivedView && can('DEMAND_CREATE') && can('DEMAND_CREATE_WITH_STATUS')}
-              canMove={!archivedView && can('DEMAND_UPDATE')}
-              canManageProduction={can('DEMAND_MANAGE_PRODUCTION')}
-              showProject={showProject}
-              searchTerm={search}
-              onOpen={(uuid) => setParam('demanda', uuid)}
-              onMove={handleMove}
-              addCardHref={(status) => newDemandHref(status)}
+        {!demandsQuery.isError && (boardLoading || hasProjects) && (
+          !boardLoading && (demandsQuery.data ?? []).length === 0 ? (
+            <BoardEmptyState
+              title={archivedView ? 'Nenhuma demanda arquivada' : undefined}
+              description={archivedView ? 'Demandas arquivadas aparecem aqui.' : undefined}
+              action={
+                !archivedView && can('DEMAND_CREATE') ? (
+                  <Link to={newDemandHref()} className={buttonClasses('primary', 'md', 'gap-2')}>
+                    <Plus className="h-4 w-4" aria-hidden="true" />
+                    Nova Demanda
+                  </Link>
+                ) : undefined
+              }
             />
           ) : (
-            <DemandListView
-              demands={filtered}
-              loading={demandsQuery.isLoading}
-              showProject={showProject}
-              searchTerm={search}
-              onOpen={(uuid) => setParam('demanda', uuid)}
-            />
-          ))
+            view === 'kanban' ? (
+              <KanbanBoard
+                demands={filtered}
+                loading={boardLoading}
+                canAddCard={!archivedView && can('DEMAND_CREATE') && can('DEMAND_CREATE_WITH_STATUS')}
+                canMove={!archivedView && can('DEMAND_UPDATE')}
+                canManageProduction={can('DEMAND_MANAGE_PRODUCTION')}
+                showProject={showProject}
+                searchTerm={search}
+                onOpen={(uuid) => setParam('demanda', uuid)}
+                onMove={handleMove}
+                addCardHref={(status) => newDemandHref(status)}
+              />
+            ) : (
+              <DemandListView
+                demands={filtered}
+                loading={boardLoading}
+                showProject={showProject}
+                searchTerm={search}
+                onOpen={(uuid) => setParam('demanda', uuid)}
+              />
+            )
+          )
         )}
       </div>
 
