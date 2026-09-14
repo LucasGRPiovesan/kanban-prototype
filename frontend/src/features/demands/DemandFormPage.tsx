@@ -4,7 +4,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
-import { CalendarDays, Info, Paperclip, Trash2, Upload } from 'lucide-react';
+import { CalendarDays, Info, Lock, Paperclip, Trash2, Upload } from 'lucide-react';
 import { useAuth } from '@/app/providers/AuthProvider';
 import { PageHeader, PageShell } from '@/components/ui/PageHeader';
 import { Button, IconButton } from '@/components/ui/Button';
@@ -12,14 +12,16 @@ import { Field, Input } from '@/components/ui/Field';
 import { RichTextEditor } from '@/components/ui/RichTextEditor';
 import { Combobox } from '@/components/ui/Combobox';
 import { ErrorState, Skeleton } from '@/components/ui/Feedback';
+import { ConfirmDialog } from '@/components/ui/Modal';
 import { useToast } from '@/components/ui/Toast';
 import { ApiError } from '@/lib/api/client';
 import { demandsApi } from '@/lib/api/endpoints';
 import { cn } from '@/lib/cn';
 import { brToIso, formatFileSize, isoToBr, maskDateInput } from '@/lib/format';
-import { demandKeys, useProjects } from '@/features/kanban/useDemands';
+import { demandKeys, useMoveDemand, useProjects } from '@/features/kanban/useDemands';
 import { DEMAND_PRIORITIES, DEMAND_STATUSES, type DemandStatus } from '@/lib/api/types';
 import { PrioritySelect } from './PrioritySelect';
+import { StatusSelect } from './StatusSelect';
 import { STATUS_PRESENTATION } from './status';
 import { ChecklistDraft } from './ChecklistDraft';
 import { ATTACHMENT_HINT } from '@/lib/uploads';
@@ -112,6 +114,7 @@ export function DemandFormPage() {
    * until the demand is created — so they are held here and written immediately after.
    */
   const [draftChecklist, setDraftChecklist] = useState<string[]>([]);
+  const [pendingProductionMove, setPendingProductionMove] = useState(false);
 
   const projectsQuery = useProjects();
   const existingQuery = useQuery({
@@ -119,6 +122,7 @@ export function DemandFormPage() {
     queryFn: () => demandsApi.get(uuid!),
     enabled: isEdit,
   });
+  const moveMutation = useMoveDemand(existingQuery.data?.project?.uuid);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -292,6 +296,7 @@ export function DemandFormPage() {
 
   const loadingExisting = isEdit && existingQuery.isLoading;
   const isTerminal = existingQuery.data?.isTerminal ?? false;
+  const isArchived = existingQuery.data?.archived ?? false;
 
   /*
    * Priority, prazo, responsável and projeto each need a capability of their own on top
@@ -303,6 +308,57 @@ export function DemandFormPage() {
   const canEditDueDate = !isEdit || can('DEMAND_UPDATE_DUE_DATE');
   const canEditResponsible = !isEdit || can('DEMAND_UPDATE_RESPONSIBLE');
   const canEditProject = !isEdit || can('DEMAND_UPDATE_PROJECT');
+
+  /*
+   * Status is not part of the form's own save — it commits on selection, the same as
+   * dragging the card on the board or the details panel's own control, reached from
+   * here for whoever is already on this screen editing everything else. It stays
+   * interactive through produção for anyone with DEMAND_UPDATE (only archived locks it
+   * outright): what to do about a locked demand is explained on selection, mirroring
+   * the details panel exactly.
+   */
+  const canManageProduction = can('DEMAND_MANAGE_PRODUCTION');
+  const canChangeStatus = isEdit && can('DEMAND_UPDATE') && !isArchived;
+
+  const handleStatusChange = (status: DemandStatus) => {
+    if (!uuid) {
+      return;
+    }
+    // Entering produção without DEMAND_MANAGE_PRODUCTION is a one-way door — asks
+    // first instead of committing on selection like every other option.
+    if (status === 'PRODUCTION' && !canManageProduction) {
+      setPendingProductionMove(true);
+      return;
+    }
+    if (isTerminal && !canManageProduction) {
+      notify(
+        'Demandas em produção só podem ser revertidas por quem tem a permissão de gerenciar demandas em produção.',
+        'error',
+      );
+      return;
+    }
+    moveMutation.mutate(
+      { uuid, status },
+      {
+        onError: (error) =>
+          notify(error instanceof ApiError ? error.message : 'Não foi possível mudar o status.', 'error'),
+      },
+    );
+  };
+
+  const confirmProductionMove = () => {
+    if (!uuid) {
+      return;
+    }
+    setPendingProductionMove(false);
+    moveMutation.mutate(
+      { uuid, status: 'PRODUCTION' },
+      {
+        onError: (error) =>
+          notify(error instanceof ApiError ? error.message : 'Não foi possível mudar o status.', 'error'),
+      },
+    );
+  };
 
   return (
     <PageShell wide>
@@ -444,6 +500,44 @@ export function DemandFormPage() {
               </div>
 
               <aside className="min-w-0 space-y-5 lg:border-l lg:border-line lg:pl-6">
+                {isEdit && existingQuery.data && (
+                  <section className="space-y-1.5">
+                    <h3 className="flex items-center gap-1.5 text-xs font-bold text-subtle">
+                      Status
+                      {!canChangeStatus && (
+                        <Lock
+                          className="h-3 w-3 shrink-0"
+                          aria-label="Você não tem permissão para mudar o status"
+                        />
+                      )}
+                    </h3>
+
+                    {canChangeStatus ? (
+                      <StatusSelect
+                        value={existingQuery.data.status}
+                        onChange={handleStatusChange}
+                        disabled={moveMutation.isPending}
+                      />
+                    ) : (
+                      <span
+                        className={cn(
+                          'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold',
+                          STATUS_PRESENTATION[existingQuery.data.status].badgeClass,
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            'h-1.5 w-1.5 rounded-full',
+                            STATUS_PRESENTATION[existingQuery.data.status].dotClass,
+                          )}
+                          aria-hidden="true"
+                        />
+                        {STATUS_PRESENTATION[existingQuery.data.status].label}
+                      </span>
+                    )}
+                  </section>
+                )}
+
                 <Field
                   label="Projeto"
                   error={form.formState.errors.projectUuid?.message}
@@ -604,6 +698,16 @@ export function DemandFormPage() {
           </div>
         </form>
       </div>
+
+      <ConfirmDialog
+        open={pendingProductionMove}
+        title="Mover para produção"
+        message="Assim que entrar em produção, esta demanda fica travada: só quem tiver a permissão de gerenciar demandas em produção poderá revertê-la e mudar o status dela de novo. Deseja continuar?"
+        confirmLabel="Mover para produção"
+        loading={moveMutation.isPending}
+        onConfirm={confirmProductionMove}
+        onCancel={() => setPendingProductionMove(false)}
+      />
     </PageShell>
   );
 }
