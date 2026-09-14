@@ -27,12 +27,10 @@ export class LogVisibilityPolicy {
   static forActor(actor: Actor, visibleProjectUuids: readonly string[] | null): LogVisibility {
     actor.require('LOG_ACCESS');
 
-    // Without project access at all, "the projects you can see" is the empty set — even
-    // if allocations exist, they confer nothing without the module's ACCESS.
-    const reachesProjects = actor.can('PROJECT_ACCESS') || actor.hasGlobalProjectAccess();
-
+    // Project activity follows allocation exactly as the demands do — not the Projetos
+    // screen's PROJECT_ACCESS, which says nothing about which projects someone works in.
     return {
-      projectUuids: reachesProjects ? visibleProjectUuids : [],
+      projectUuids: visibleProjectUuids,
       organization: actor.can('LOG_VIEW_ORGANIZATION'),
       system: actor.can('LOG_VIEW_SYSTEM'),
     };

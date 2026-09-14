@@ -110,6 +110,11 @@ describe('canStillWatch', () => {
     expect(canStillWatch(watcher('a', { permissionCodes: codes, memberOfProject: true }), true)).toBe(true);
   });
 
+  it('keeps the watch of an allocated member whose profile lost the Projetos screen', () => {
+    const codes = ['DEMAND_ACCESS', 'DEMAND_VIEW_ALL', 'DEMAND_WATCH'];
+    expect(canStillWatch(watcher('a', { permissionCodes: codes, memberOfProject: true }), true)).toBe(true);
+  });
+
   it('requires DEMAND_VIEW_ALL, or owning the demand', () => {
     const codes = ['DEMAND_ACCESS', 'DEMAND_WATCH', 'PROJECT_ACCESS_ALL', 'PROJECT_ACCESS'];
     expect(canStillWatch(watcher('a', { permissionCodes: codes }), true)).toBe(false);

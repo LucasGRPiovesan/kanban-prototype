@@ -394,7 +394,11 @@ export function DemandFormPage() {
           }
           crumbs={[
             { label: 'Home', to: '/' },
-            { label: 'Demandas', to: '/kanban' },
+            {
+              label: 'Demandas',
+              // Whichever demand screen this profile actually has; neither, and it is text.
+              to: can('DEMAND_LIST') ? '/demandas' : can('DEMAND_KANBAN') ? '/kanban' : undefined,
+            },
             { label: isEdit ? 'Editar' : 'Novo' },
           ]}
         />

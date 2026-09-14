@@ -34,6 +34,7 @@ import {
 import {
   CreateUser,
   DeleteUser,
+  GetUserDeletionImpact,
   GetUser,
   GetUserHistory,
   ListUsers,
@@ -58,6 +59,7 @@ import {
   ListProjectMembers,
   ListProjects,
   ProjectAccessResolver,
+  ListReachableProjects,
   RemoveProjectMember,
   UpdateProject,
 } from '../modules/projects/application/use-cases/project.use-cases';
@@ -368,6 +370,7 @@ export function buildDependencies(
         demandActivity,
         systemLogger,
       ),
+      getUserDeletionImpact: new GetUserDeletionImpact(demandRepository),
       restoreUser: new RestoreUser(userRepository, userRepository, uow, activityRecorder),
       listRoles: new ListRoles(roleRepository),
       listAssignableRoles: new ListAssignableRoles(roleRepository),
@@ -424,6 +427,7 @@ export function buildDependencies(
       listDemands: new ListDemands(demandRepository, projectAccess, storage),
       listDemandsPage: new ListDemandsPage(demandRepository, projectAccess, storage),
       getDemandFilters: new GetDemandFilters(demandRepository, projectAccess),
+      listReachableProjects: new ListReachableProjects(projectRepository, projectAccess),
       getDemand: new GetDemand(demandGuard, demandRepository, storage),
       createDemand: new CreateDemand(
         demandRepository,

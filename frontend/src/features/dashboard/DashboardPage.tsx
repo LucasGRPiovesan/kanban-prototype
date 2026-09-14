@@ -492,6 +492,13 @@ function DemandList({
   onOpen: (uuid: string) => void;
   more: number;
 }) {
+  const { can } = useAuth();
+  const moreScreen = can('DEMAND_KANBAN')
+    ? { to: '/kanban', label: 'quadro' }
+    : can('DEMAND_LIST')
+      ? { to: '/demandas', label: 'tela Demandas' }
+      : null;
+
   return (
     <div className="space-y-2">
       <ul className="-mx-2">
@@ -533,10 +540,18 @@ function DemandList({
       </ul>
       {more > 0 && (
         <p className="text-xs text-subtle">
-          E mais {more} — veja todas no{' '}
-          <Link to="/kanban" className="font-semibold text-brand-700 underline underline-offset-2 hover:text-brand-800">
-            quadro
-          </Link>
+          E mais {more}
+          {moreScreen && (
+            <>
+              {' '}— veja todas no{moreScreen.to === '/demandas' ? 'a' : ''}{' '}
+              <Link
+                to={moreScreen.to}
+                className="font-semibold text-brand-700 underline underline-offset-2 hover:text-brand-800"
+              >
+                {moreScreen.label}
+              </Link>
+            </>
+          )}
           .
         </p>
       )}

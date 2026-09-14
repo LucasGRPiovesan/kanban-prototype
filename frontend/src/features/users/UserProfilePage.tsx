@@ -13,7 +13,7 @@ import { PageHeader, PageShell } from '@/components/ui/PageHeader';
 import { TabPanel, Tabs } from '@/components/ui/Tabs';
 import { useToast } from '@/components/ui/Toast';
 import { ApiError } from '@/lib/api/client';
-import { demandsApi, rolesApi } from '@/lib/api/endpoints';
+import { demandsApi, rolesApi, usersApi } from '@/lib/api/endpoints';
 import { DemandDetailsPanel } from '@/features/demands/DemandDetailsPanel';
 import { DemandsTable, DemandsTableSkeleton } from '@/features/demands/DemandsTable';
 import { DeleteUserDialog } from './DeleteUserDialog';
@@ -45,13 +45,30 @@ export function UserProfilePage() {
     queryFn: rolesApi.assignable,
     staleTime: 60_000,
   });
+  // The demands tab is a reading of demands, so it follows DEMAND_ACCESS — a profile that
+  // manages accounts without reading demands gets no tab, rather than a silent empty one.
+  const canReadDemands = can('DEMAND_ACCESS');
   const demandsQuery = useQuery({
-    queryKey: ['demands', 'historyPage', { responsibleUuid: uuid, limit: 10, includeArchived: true }],
+    queryKey: [
+      'demands',
+      'historyPage',
+      { responsibleUuid: uuid, limit: 10, includeArchived: true },
+    ],
     // Every demand tied to this person, archived ones included — an archived demand is
     // still their work, just hidden from the board, and the whole point of this screen
     // is seeing what depends on them, archived or not.
-    queryFn: () => demandsApi.historyPage({ responsibleUuid: uuid, limit: 10, includeArchived: true }),
-    enabled: Boolean(uuid),
+    queryFn: () =>
+      demandsApi.historyPage({ responsibleUuid: uuid, limit: 10, includeArchived: true }),
+    enabled: Boolean(uuid) && canReadDemands,
+  });
+  const [deleting, setDeleting] = useState(false);
+  // Counted by the server the same way the exclusion selects demands — never from the
+  // listing above, which only holds what *this viewer* may see.
+  const impactQuery = useQuery({
+    queryKey: ['users', uuid, 'deletion-impact'],
+    queryFn: () => usersApi.deletionImpact(uuid),
+    enabled: deleting,
+    staleTime: 0,
   });
 
   const updateMutation = useUpdateUser();
@@ -59,9 +76,15 @@ export function UserProfilePage() {
   const restoreMutation = useRestoreUser();
 
   const [editing, setEditing] = useState<EditableField | null>(null);
-  const [tab, setTab] = useState<ProfileTab>('demands');
+  const [tab, setTab] = useState<ProfileTab>(canReadDemands ? 'demands' : 'history');
   const [openDemand, setOpenDemand] = useState<string | null>(null);
-  const [deleting, setDeleting] = useState(false);
+
+  useEffect(() => {
+    if (impactQuery.isError) {
+      setDeleting(false);
+      notify('Não foi possível verificar as demandas deste usuário.', 'error');
+    }
+  }, [impactQuery.isError, notify]);
 
   const [roleDraft, setRoleDraft] = useState('');
   useEffect(() => {
@@ -195,6 +218,7 @@ export function UserProfilePage() {
                   <Button
                     variant="danger-outline"
                     icon={<Trash2 className="h-4 w-4" />}
+                    loading={deleting && impactQuery.isFetching}
                     onClick={() => setDeleting(true)}
                   >
                     Excluir
@@ -254,7 +278,10 @@ export function UserProfilePage() {
               display={<p className="text-sm font-medium text-body">{user.role.name}</p>}
             >
               <Combobox
-                options={(rolesQuery.data ?? []).map((role) => ({ value: role.uuid, label: role.name }))}
+                options={(rolesQuery.data ?? []).map((role) => ({
+                  value: role.uuid,
+                  label: role.name,
+                }))}
                 value={roleDraft}
                 onChange={(value) => setRoleDraft(value ?? '')}
                 loading={rolesQuery.isLoading}
@@ -323,40 +350,61 @@ export function UserProfilePage() {
             value={tab}
             onChange={setTab}
             items={[
-              { value: 'demands', label: 'Demandas', icon: ListChecks, count: demandTotal || undefined },
+              ...(canReadDemands
+                ? [
+                    {
+                      value: 'demands' as const,
+                      label: 'Demandas',
+                      icon: ListChecks,
+                      count: demandTotal || undefined,
+                    },
+                  ]
+                : []),
               { value: 'history', label: 'Atualizações', icon: History },
             ]}
           />
 
-          <TabPanel tabsId={`user-${user.uuid}`} value="demands" active={tab === 'demands'} className="pt-5">
-            {demandsQuery.isLoading ? (
-              <div className="overflow-hidden rounded-xl border border-line bg-surface shadow-card">
-                <DemandsTableSkeleton rows={4} />
-              </div>
-            ) : demands.length === 0 ? (
-              <p className="rounded-xl border border-dashed border-line px-4 py-6 text-center text-sm text-subtle">
-                Nenhuma demanda vinculada a este usuário.
-              </p>
-            ) : (
-              <div className="space-y-2">
+          {canReadDemands && (
+            <TabPanel
+              tabsId={`user-${user.uuid}`}
+              value="demands"
+              active={tab === 'demands'}
+              className="pt-5"
+            >
+              {demandsQuery.isLoading ? (
                 <div className="overflow-hidden rounded-xl border border-line bg-surface shadow-card">
-                  <DemandsTable demands={demands} onOpen={setOpenDemand} />
+                  <DemandsTableSkeleton rows={4} />
                 </div>
-                {demandTotal > demands.length && (
-                  <div className="flex justify-end">
-                    <Link
-                      to={`/demandas?responsavel=${uuid}`}
-                      className="text-xs font-semibold text-brand-700 hover:underline"
-                    >
-                      Ver todas as {demandTotal} demandas
-                    </Link>
+              ) : demands.length === 0 ? (
+                <p className="rounded-xl border border-dashed border-line px-4 py-6 text-center text-sm text-subtle">
+                  Nenhuma demanda vinculada a este usuário.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  <div className="overflow-hidden rounded-xl border border-line bg-surface shadow-card">
+                    <DemandsTable demands={demands} onOpen={setOpenDemand} />
                   </div>
-                )}
-              </div>
-            )}
-          </TabPanel>
+                  {demandTotal > demands.length && can('DEMAND_LIST') && (
+                    <div className="flex justify-end">
+                      <Link
+                        to={`/demandas?responsavel=${uuid}`}
+                        className="text-xs font-semibold text-brand-700 hover:underline"
+                      >
+                        Ver todas as {demandTotal} demandas
+                      </Link>
+                    </div>
+                  )}
+                </div>
+              )}
+            </TabPanel>
+          )}
 
-          <TabPanel tabsId={`user-${user.uuid}`} value="history" active={tab === 'history'} className="pt-5">
+          <TabPanel
+            tabsId={`user-${user.uuid}`}
+            value="history"
+            active={tab === 'history'}
+            className="pt-5"
+          >
             <UserHistory userUuid={uuid} />
           </TabPanel>
         </div>
@@ -365,10 +413,14 @@ export function UserProfilePage() {
       <DemandDetailsPanel demandUuid={openDemand} onClose={() => setOpenDemand(null)} />
 
       <DeleteUserDialog
-        open={deleting}
+        // Opens only once the real count is in: offering "Excluir" on a count still at
+        // zero is exactly the silent-deletion path this count exists to close.
+        open={deleting && impactQuery.isSuccess}
         userName={user.name}
-        demandCount={demandTotal}
-        loading={deleteMutation.isPending ? deleteMutation.variables?.demandAction ?? false : false}
+        demandCount={impactQuery.data?.responsibleDemands ?? 0}
+        loading={
+          deleteMutation.isPending ? (deleteMutation.variables?.demandAction ?? false) : false
+        }
         onChoose={handleDeleteChoice}
         onCancel={() => setDeleting(false)}
       />

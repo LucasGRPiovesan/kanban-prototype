@@ -31,6 +31,10 @@ function parentOf(group: PermissionModuleGroup, code: PermissionCode): Permissio
     return undefined;
   }
   const permission = group.permissions.find((candidate) => candidate.code === code);
+  // A standalone scope grant (PROJECT_ACCESS_ALL) is a root of its own, like ACCESS.
+  if (permission?.standalone) {
+    return undefined;
+  }
   return permission?.dependsOn ?? group.accessCode;
 }
 

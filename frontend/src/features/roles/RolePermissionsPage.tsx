@@ -310,6 +310,7 @@ function PermissionEditor({
                         <span className="min-w-0 flex-1">
                           <span className="block text-sm text-body">{permission.description}</span>
                           <span className="block text-2xs text-subtle">{permission.code}</span>
+                          {permission.standalone && <StandaloneNote />}
                         </span>
                         {isAccess && (
                           <ShieldCheck
@@ -327,6 +328,18 @@ function PermissionEditor({
         </div>
       </div>
     </PageShell>
+  );
+}
+
+/**
+ * Marks a data-scope grant that is not switched off with its module's ACCESS — otherwise
+ * an enabled checkbox inside a greyed-out module would read as a rendering bug.
+ */
+export function StandaloneNote() {
+  return (
+    <span className="mt-0.5 block text-2xs font-medium text-muted">
+      Vale mesmo sem acesso à tela deste módulo.
+    </span>
   );
 }
 

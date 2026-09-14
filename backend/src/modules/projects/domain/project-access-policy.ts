@@ -26,12 +26,16 @@ export class ProjectAccessPolicy {
    * boundary to cross and nothing here to decide — whatever else governs it (for a
    * demand: being its responsible, or holding DEMAND_VIEW_ALL) decides alone.
    */
+  /**
+   * Allocation (or PROJECT_ACCESS_ALL) decides, and nothing else. PROJECT_ACCESS is
+   * deliberately absent: it opens the Projetos *screen*, while this boundary protects
+   * the *data* of every module — withdrawing a screen must never cut someone off from the
+   * demands of projects they are still allocated to. Each caller still requires its own
+   * module's capability (DEMAND_ACCESS, LOG_ACCESS, PROJECT_ACCESS…) on top of this.
+   */
   canAccess(actor: Actor, projectUuid: Uuid | null): boolean {
     if (projectUuid === null) {
       return true;
-    }
-    if (!actor.can('PROJECT_ACCESS') && !actor.hasGlobalProjectAccess()) {
-      return false;
     }
     if (actor.hasGlobalProjectAccess()) {
       return true;

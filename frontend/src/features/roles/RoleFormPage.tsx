@@ -11,7 +11,14 @@ import { ApiError } from '@/lib/api/client';
 import { rolesApi } from '@/lib/api/endpoints';
 import { cn } from '@/lib/cn';
 import type { PermissionCode } from '@/lib/api/types';
-import { isModuleEnabled, moduleLabel, togglePermission } from './permissionPolicy';
+import {
+  depthOf,
+  isModuleEnabled,
+  isPermissionEnabled,
+  moduleLabel,
+  togglePermission,
+} from './permissionPolicy';
+import { StandaloneNote } from './RolePermissionsPage';
 
 /**
  * Registration on its own screen rather than in a dialog.
@@ -153,18 +160,23 @@ export function RoleFormPage() {
                 <div className="space-y-1 pt-1">
                   {group.permissions.map((permission) => {
                     const isAccess = permission.code === group.accessCode;
-                    const disabled = !isAccess && !enabled;
+                    // Same rules as the permissions editor: inert while anything in its
+                    // dependency chain is off, indented one step per dependency.
+                    const disabled = !isPermissionEnabled(group, selected, permission);
                     const checked = selected.includes(permission.code);
+                    const depth = depthOf(group, permission.code);
 
                     return (
                       <label
                         key={permission.code}
+                        style={depth > 1 ? { marginLeft: `${(depth - 1) * 1.5}rem` } : undefined}
                         className={cn(
                           'flex items-start gap-2.5 rounded-lg px-2 py-2 transition-colors duration-150',
                           disabled
                             ? 'cursor-not-allowed opacity-45'
                             : 'cursor-pointer hover:bg-surface-muted',
                           isAccess && 'font-semibold',
+                          depth > 1 && 'border-l border-line pl-3',
                         )}
                       >
                         <input
@@ -181,6 +193,7 @@ export function RoleFormPage() {
                         <span className="min-w-0 flex-1">
                           <span className="block text-sm text-body">{permission.description}</span>
                           <span className="block text-2xs text-subtle">{permission.code}</span>
+                          {permission.standalone && <StandaloneNote />}
                         </span>
                         {isAccess && (
                           <ShieldCheck

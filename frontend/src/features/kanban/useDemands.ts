@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { demandsApi, projectsApi } from '@/lib/api/endpoints';
+import { demandsApi } from '@/lib/api/endpoints';
 import type { Demand, DemandPriority, DemandStatus } from '@/lib/api/types';
 
 export const demandKeys = {
@@ -10,7 +10,9 @@ export const demandKeys = {
 };
 
 export const projectKeys = {
-  list: ['projects'] as const,
+  // Under the `projects` prefix so a change on the Projetos screen still refreshes it,
+  // but never the same entry as that screen's own listing, which carries members.
+  reachable: ['projects', 'reachable'] as const,
   assignees: (projectUuid: string, search?: string) =>
     ['projects', projectUuid, 'assignees', search ?? ''] as const,
 };
@@ -26,10 +28,14 @@ export const assigneeKeys = {
   of: (projectUuid?: string) => ['demands', 'assignees', projectUuid ?? 'sem-projeto'] as const,
 };
 
+/**
+ * The projects the user works in — for demand screens. Deliberately not the Projetos
+ * screen's endpoint: a profile without PROJECT_ACCESS still works in its projects.
+ */
 export function useProjects() {
   return useQuery({
-    queryKey: projectKeys.list,
-    queryFn: () => projectsApi.list(),
+    queryKey: projectKeys.reachable,
+    queryFn: () => demandsApi.projects(),
     staleTime: 60_000,
   });
 }

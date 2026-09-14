@@ -7,6 +7,8 @@
 
 export const PERMISSION_CODES = [
   'DEMAND_ACCESS',
+  'DEMAND_KANBAN',
+  'DEMAND_LIST',
   'DEMAND_VIEW_ALL',
   'DEMAND_CREATE',
   'DEMAND_CREATE_WITH_STATUS',
@@ -140,6 +142,8 @@ export interface PermissionDefinition {
   description: string;
   /** The permission this one is inert without, beyond the module's own ACCESS. */
   dependsOn?: PermissionCode;
+  /** A data-scope grant that stays in effect without its module's ACCESS. */
+  standalone?: true;
 }
 
 export interface PermissionModuleGroup {

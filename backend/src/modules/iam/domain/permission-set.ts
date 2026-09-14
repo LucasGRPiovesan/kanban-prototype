@@ -5,6 +5,7 @@ import {
   accessPermissionOf,
   isPermissionCode,
   moduleOf,
+  permissionDefinition,
 } from './permission';
 
 /**
@@ -48,7 +49,11 @@ export class PermissionSet {
     const result = new Set<PermissionCode>();
     for (const code of this.granted) {
       const module = moduleOf(code);
-      if (this.isAccessPermission(code) || this.granted.has(accessPermissionOf(module))) {
+      if (
+        this.isAccessPermission(code) ||
+        isStandalone(code) ||
+        this.granted.has(accessPermissionOf(module))
+      ) {
         result.add(code);
       }
     }
@@ -89,7 +94,9 @@ export class PermissionSet {
       }
     }
     for (const code of [...requested]) {
-      requested.add(accessPermissionOf(moduleOf(code)));
+      if (!isStandalone(code)) {
+        requested.add(accessPermissionOf(moduleOf(code)));
+      }
     }
     return PERMISSION_CATALOG.filter((p) => requested.has(p.code)).map((p) => p.code);
   }
@@ -102,4 +109,9 @@ export class PermissionSet {
   private isAccessPermission(code: PermissionCode): boolean {
     return code === accessPermissionOf(moduleOf(code));
   }
+}
+
+/** See `PermissionDefinition.standalone`: a scope grant outside its module's ACCESS. */
+function isStandalone(code: PermissionCode): boolean {
+  return permissionDefinition(code).standalone === true;
 }

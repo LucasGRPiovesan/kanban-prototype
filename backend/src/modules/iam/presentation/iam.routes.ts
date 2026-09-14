@@ -21,6 +21,7 @@ import {
 import {
   type CreateUser,
   type DeleteUser,
+  type GetUserDeletionImpact,
   type GetUser,
   type GetUserHistory,
   type ListUsers,
@@ -60,6 +61,7 @@ export interface IamPresentationDeps {
   createUser: CreateUser;
   updateUser: UpdateUser;
   deleteUser: DeleteUser;
+  getUserDeletionImpact: GetUserDeletionImpact;
   restoreUser: RestoreUser;
   listRoles: ListRoles;
   listAssignableRoles: ListAssignableRoles;
@@ -232,6 +234,15 @@ export function createUsersRouter(deps: IamPresentationDeps): Router {
    * requires USER_UPDATE too, the same double-check the route-level guard and the use
    * case both perform everywhere else in this codebase.
    */
+  router.get(
+    '/:uuid/deletion-impact',
+    requirePermission('USER_DELETE'),
+    asyncHandler(async (req, res) => {
+      const { uuid } = uuidParam.parse(req.params);
+      return ok(res, await deps.getUserDeletionImpact.execute(currentActor(req), uuid));
+    }),
+  );
+
   router.delete(
     '/:uuid',
     requirePermission('USER_DELETE'),

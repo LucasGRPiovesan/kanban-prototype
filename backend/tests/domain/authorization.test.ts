@@ -40,11 +40,22 @@ describe('ProjectAccessPolicy — project isolation', () => {
     expect(policy.visibleProjectUuids(admin)).toBeNull();
   });
 
-  it('denies everything without PROJECT_ACCESS, even with memberships', () => {
+  // Regression: withdrawing the Projetos screen (PROJECT_ACCESS) used to cut a
+  // Desenvolvedor off from the demands of projects they were still allocated to.
+  it('follows allocation without PROJECT_ACCESS — the Projetos screen is not the allocation', () => {
     const policy = ProjectAccessPolicy.forMemberships([projectA.toString()]);
-    const actor = actorWith([]);
+    const actor = actorWith(['DEMAND_ACCESS']);
 
-    expect(policy.canAccess(actor, projectA)).toBe(false);
+    expect(policy.canAccess(actor, projectA)).toBe(true);
+    expect(policy.canAccess(actor, projectB)).toBe(false);
+  });
+
+  it('keeps PROJECT_ACCESS_ALL in effect without PROJECT_ACCESS', () => {
+    const policy = ProjectAccessPolicy.forMemberships([]);
+    const actor = actorWith(['DEMAND_ACCESS', 'PROJECT_ACCESS_ALL']);
+
+    expect(policy.canAccess(actor, projectB)).toBe(true);
+    expect(policy.visibleProjectUuids(actor)).toBeNull();
   });
 
   it('restricts the visible list to actual memberships', () => {

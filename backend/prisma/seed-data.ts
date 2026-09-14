@@ -46,6 +46,8 @@ export const SYSTEM_ROLES = [
     slug: 'administrador',
     permissions: [
       'DEMAND_ACCESS',
+      'DEMAND_KANBAN',
+      'DEMAND_LIST',
       'DEMAND_VIEW_ALL',
       'DEMAND_CREATE',
       'USER_ACCESS',
@@ -76,6 +78,8 @@ export const SYSTEM_ROLES = [
     slug: 'agilista',
     permissions: [
       'DEMAND_ACCESS',
+      'DEMAND_KANBAN',
+      'DEMAND_LIST',
       /*
        * Unlike the Desenvolvedor's DEMAND_VIEW_ALL below, this one is paired with
        * PROJECT_ACCESS_ALL: an Agilista oversees delivery across every team's board, not
@@ -120,6 +124,8 @@ export const SYSTEM_ROLES = [
     slug: 'desenvolvedor',
     permissions: [
       'DEMAND_ACCESS',
+      'DEMAND_KANBAN',
+      'DEMAND_LIST',
       /*
        * Granted to all three seeded profiles on purpose.
        *

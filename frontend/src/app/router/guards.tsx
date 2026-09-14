@@ -1,4 +1,4 @@
-import { Navigate } from 'react-router-dom';
+import { Navigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/app/providers/AuthProvider';
 import { FullPageLoader } from '@/components/ui/FullPageLoader';
 import type { PermissionCode } from '@/lib/api/types';
@@ -65,4 +65,28 @@ export function ModuleAccessGuard({
     return <Navigate to="/" replace />;
   }
   return <>{children}</>;
+}
+
+/**
+ * The Kanban route, which is also where every link to a single demand points
+ * (`/kanban?demanda=<uuid>` — notifications, the assistant's citations, exported PDFs).
+ *
+ * Opening a demand needs DEMAND_ACCESS, not the board. So a profile without
+ * DEMAND_KANBAN following such a link is sent to the same demand's details on a screen
+ * it does have — Demandas, or else the Dashboard — instead of being bounced home.
+ */
+export function KanbanRouteGuard({ children }: { children: React.ReactNode }) {
+  const { canEvery } = useAuth();
+  const [params] = useSearchParams();
+  const demand = params.get('demanda');
+
+  if (!canEvery(['DEMAND_KANBAN']) && demand && canEvery(['DEMAND_ACCESS'])) {
+    const screen = canEvery(['DEMAND_LIST']) ? '/demandas' : '/dashboard';
+    return <Navigate to={`${screen}?demanda=${encodeURIComponent(demand)}`} replace />;
+  }
+  return (
+    <ModuleAccessGuard permissions={['DEMAND_ACCESS', 'DEMAND_KANBAN']}>
+      {children}
+    </ModuleAccessGuard>
+  );
 }

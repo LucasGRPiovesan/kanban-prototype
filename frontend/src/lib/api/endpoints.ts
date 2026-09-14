@@ -95,6 +95,9 @@ export const usersApi = {
     api.delete<void>(`/users/${uuid}`, { demandAction }),
   /** Undoes a soft delete. `active` is left as the exclusion set it — see RestoreUser. */
   restore: (uuid: string) => api.post<User>(`/users/${uuid}/restore`, {}),
+  /** What excluding this user would do to demands — independent of what the viewer can read. */
+  deletionImpact: (uuid: string) =>
+    api.get<{ responsibleDemands: number }>(`/users/${uuid}/deletion-impact`),
 };
 
 export const rolesApi = {
@@ -163,6 +166,11 @@ export const demandsApi = {
   ) => api.get<DemandPage>(`/demands/history${toQuery(params)}`),
   /** Option lists for the Demandas screen's filter bar. */
   filters: () => api.get<DemandFilterOptions>('/demands/filters'),
+  /**
+   * The projects the user works in, for demand screens' filters and pickers. Needs only
+   * DEMAND_ACCESS — unlike `projectsApi.list`, which is the Projetos screen's own listing.
+   */
+  projects: () => api.get<Project[]>('/demands/projects'),
   /**
    * Who may be the responsible of a demand. Narrowed to a project when one is given;
    * everyone who may hold a demand at all when none is — which is the list a demand with

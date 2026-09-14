@@ -60,8 +60,13 @@ interface NavItem {
  * everything else in the order it was added.
  */
 export const NAV_ITEMS: NavItem[] = [
-  { to: '/kanban', label: 'Kanban', icon: Kanban, permissions: ['DEMAND_ACCESS'] },
-  { to: '/demandas', label: 'Demandas', icon: LayoutList, permissions: ['DEMAND_ACCESS'] },
+  { to: '/kanban', label: 'Kanban', icon: Kanban, permissions: ['DEMAND_ACCESS', 'DEMAND_KANBAN'] },
+  {
+    to: '/demandas',
+    label: 'Demandas',
+    icon: LayoutList,
+    permissions: ['DEMAND_ACCESS', 'DEMAND_LIST'],
+  },
   { to: '/usuarios', label: 'Usuários', icon: Users, permissions: ['USER_ACCESS'] },
   {
     to: '/dashboard',

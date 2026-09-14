@@ -47,14 +47,14 @@ const SHORTCUTS: Shortcut[] = [
     label: 'Quadro Kanban',
     description: 'Acompanhe e movimente as demandas dos seus projetos.',
     icon: Kanban,
-    permissions: ['DEMAND_ACCESS'],
+    permissions: ['DEMAND_ACCESS', 'DEMAND_KANBAN'],
   },
   {
     to: '/demandas/nova',
     label: 'Cadastrar demanda',
     description: 'Abra uma nova demanda em um dos seus projetos.',
     icon: Plus,
-    permissions: ['DEMAND_CREATE'],
+    permissions: ['DEMAND_ACCESS', 'DEMAND_CREATE'],
   },
   {
     to: '/usuarios/novo',

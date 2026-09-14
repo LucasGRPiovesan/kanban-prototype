@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { depthOf, isModuleEnabled, isPermissionEnabled, togglePermission } from './permissionPolicy';
+import {
+  depthOf,
+  isModuleEnabled,
+  isPermissionEnabled,
+  togglePermission,
+} from './permissionPolicy';
 import type { PermissionCode, PermissionModuleGroup } from '@/lib/api/types';
 
 const groups: PermissionModuleGroup[] = [
@@ -31,6 +36,37 @@ const groups: PermissionModuleGroup[] = [
 ];
 
 describe('Role editor permission policy', () => {
+  it('treats a standalone scope grant as independent of its module ACCESS', () => {
+    const projects: PermissionModuleGroup = {
+      module: 'PROJECT',
+      accessCode: 'PROJECT_ACCESS',
+      permissions: [
+        { code: 'PROJECT_ACCESS', module: 'PROJECT', action: 'ACCESS', description: 'Tela' },
+        {
+          code: 'PROJECT_ACCESS_ALL',
+          module: 'PROJECT',
+          action: 'ACCESS_ALL',
+          description: 'Todos',
+          standalone: true,
+        },
+      ],
+    };
+    const all = projects.permissions[1]!;
+    expect(togglePermission([projects], [], 'PROJECT_ACCESS_ALL', true)).toEqual([
+      'PROJECT_ACCESS_ALL',
+    ]);
+    expect(isPermissionEnabled(projects, [], all)).toBe(true);
+    expect(depthOf(projects, 'PROJECT_ACCESS_ALL')).toBe(0);
+    expect(
+      togglePermission(
+        [projects],
+        ['PROJECT_ACCESS', 'PROJECT_ACCESS_ALL'],
+        'PROJECT_ACCESS',
+        false,
+      ),
+    ).toEqual(['PROJECT_ACCESS_ALL']);
+  });
+
   it('enabling a child also enables the module ACCESS', () => {
     const result = togglePermission(groups, [], 'DEMAND_CREATE', true);
     expect(result).toEqual(['DEMAND_ACCESS', 'DEMAND_CREATE']);

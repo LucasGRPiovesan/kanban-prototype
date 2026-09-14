@@ -8,6 +8,7 @@ import { ALLOWED_MIME_TYPES } from '../domain/demand-attachment';
 import { DEMAND_PRIORITIES } from '../domain/demand-priority';
 import { DEMAND_STATUSES } from '../domain/demand-status';
 import { DEMAND_SORTS } from '../application/ports/repositories';
+import { type ListReachableProjects } from '../../projects/application/use-cases/project.use-cases';
 import { type DeleteAttachment, type UploadAttachments } from '../application/use-cases/attachment.use-cases';
 import {
   type AddChecklistItem,
@@ -163,6 +164,7 @@ export interface DemandsPresentationDeps {
   listDemands: ListDemands;
   listDemandsPage: ListDemandsPage;
   getDemandFilters: GetDemandFilters;
+  listReachableProjects: ListReachableProjects;
   getDemand: GetDemand;
   createDemand: CreateDemand;
   updateDemand: UpdateDemand;
@@ -204,6 +206,14 @@ export function createDemandsRouter(deps: DemandsPresentationDeps): Router {
     },
   });
 
+  /*
+   * DEMAND_KANBAN and DEMAND_LIST decide which *screens* a profile opens, not which
+   * demands it may read: both listings below apply exactly the same visibility rules
+   * (DEMAND_ACCESS, DEMAND_VIEW_ALL, allocation), so neither exposes anything the other
+   * would not. They stay on DEMAND_ACCESS because other modules read them too — the
+   * Usuários screen lists a person's demands through `/history` — and withholding a
+   * screen must never break a different module that legitimately reads the same data.
+   */
   router.get(
     '/',
     requirePermission('DEMAND_ACCESS'),
@@ -211,6 +221,12 @@ export function createDemandsRouter(deps: DemandsPresentationDeps): Router {
       const query = listQuery.parse(req.query);
       return ok(res, await deps.listDemands.execute(currentActor(req), query));
     }),
+  );
+
+  router.get(
+    '/projects',
+    requirePermission('DEMAND_ACCESS'),
+    asyncHandler(async (req, res) => ok(res, await deps.listReachableProjects.execute(currentActor(req)))),
   );
 
   router.post(

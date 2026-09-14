@@ -41,22 +41,44 @@ Permissões são **semânticas**, não um CRUD genérico. Quando aparece uma aç
 específica, ela ganha a própria permissão — `DEMAND_BE_ASSIGNEE` é o exemplo claro: não é
 um "update".
 
-O quadro Kanban **não é um módulo à parte** — é uma visão sobre demandas, e é governado
-pelas mesmas permissões de Demandas. Uma versão anterior tinha `KANBAN_ACCESS` e
-`KANBAN_MOVE` como permissões próprias, mas nos três perfis do escopo original as duas
-sempre andavam junto de `DEMAND_ACCESS` e `DEMAND_UPDATE` — nunca uma sem a outra — e a
-própria rota `/kanban` já exigia `DEMAND_ACCESS` além de `KANBAN_ACCESS` para fazer
-qualquer coisa. A separação não protegia nenhum cenário real; só obrigava quem já podia
-editar uma demanda a precisar de uma segunda permissão, concedida à parte, só para poder
-arrastar o card ou trocar o status pelo seletor. Unificado: acessar o quadro é
-`DEMAND_ACCESS`, e mover um card é `DEMAND_UPDATE`, o mesmo que qualquer outra edição de
-escopo na demanda.
+### Telas × dados × alocação: três perguntas diferentes
 
-### Demandas (inclui o quadro Kanban)
+Uma permissão responde **uma** pergunta, e nunca deve cortar a resposta de outra:
+
+| Pergunta | Quem responde |
+|---|---|
+| Quais **telas** o perfil abre? | As permissões de tela: `DEMAND_KANBAN`, `DEMAND_LIST`, `PROJECT_ACCESS`, `USER_ACCESS`… |
+| Quais **dados** o perfil lê e altera? | As capabilities de cada módulo: `DEMAND_ACCESS`, `DEMAND_VIEW_ALL`, `DEMAND_UPDATE`, `DEMAND_MANAGE_ALL`… |
+| Em quais **projetos** o perfil atua? | A **alocação** (`project_members`), ou `PROJECT_ACCESS_ALL` |
+
+Consequências, todas cobertas por testes:
+
+- **Tirar a tela Projetos (`PROJECT_ACCESS`) não desvincula ninguém dos seus projetos.**
+  Demandas, Dashboard, logs, notificações e o assistente continuam seguindo a alocação.
+  (Antes, `ProjectAccessPolicy` exigia `PROJECT_ACCESS` e o painel de uma demanda do
+  próprio projeto respondia `404 PROJECT_NOT_FOUND`.) As telas de demandas buscam seus
+  projetos em `GET /demands/projects` (exige `DEMAND_ACCESS`), não na listagem da tela
+  Projetos.
+- **`PROJECT_ACCESS_ALL` é escopo, não recurso da tela Projetos** — por isso é a única
+  permissão marcada como `standalone`: continua valendo sem `PROJECT_ACCESS`.
+- **Kanban e Demandas são telas independentes.** `DEMAND_ACCESS` é a leitura de demandas
+  (painel da demanda, Dashboard, notificações); `DEMAND_KANBAN` e `DEMAND_LIST` são filhas
+  dela, cada uma abrindo uma tela. As duas listagens aplicam exatamente as mesmas regras de
+  visibilidade, então retirar uma tela não esconde dado que a outra mostraria — por isso os
+  endpoints de listagem seguem em `DEMAND_ACCESS` (a tela Usuários também os lê). Links
+  para uma demanda (`/kanban?demanda=…`) abrem na tela Demandas, ou no Dashboard, para quem
+  não tem o Kanban.
+- **Excluir um usuário conta as demandas pelo servidor** (`GET /users/:uuid/deletion-impact`,
+  mesma seleção de `DeleteUser`), nunca pela listagem de demandas de quem está excluindo —
+  que depende da visibilidade *dele* e podia mostrar "0" e apagar demandas sem avisar.
+
+### Demandas
 
 | Código | Descrição |
 |---|---|
-| `DEMAND_ACCESS` | Acessar demandas e seus detalhes, incluindo o quadro Kanban |
+| `DEMAND_ACCESS` | Acessar demandas e seus detalhes (painel da demanda, Dashboard e notificações) |
+| `DEMAND_KANBAN` | Acessar o quadro Kanban |
+| `DEMAND_LIST` | Acessar a tela Demandas (histórico e listagem completa) |
 | `DEMAND_VIEW_ALL` | Visualizar todas as demandas, e não apenas as que são suas |
 | `DEMAND_CREATE` | Cadastrar novas demandas |
 | `DEMAND_CREATE_WITH_STATUS` | Criação de demanda por status |
@@ -126,8 +148,8 @@ congelado mesmo para quem tem essa permissão — só o status é reaberto.
 
 | Código | Descrição |
 |---|---|
-| `PROJECT_ACCESS` | Acessar projetos dos quais participa |
-| `PROJECT_ACCESS_ALL` | Acessar **todos** os projetos, independente de alocação |
+| `PROJECT_ACCESS` | Acessar a tela Projetos (projetos dos quais participa) |
+| `PROJECT_ACCESS_ALL` | Participar de **todos** os projetos, sem precisar de alocação — *standalone*: vale mesmo sem `PROJECT_ACCESS` |
 | `PROJECT_CREATE` | Cadastrar novos projetos |
 | `PROJECT_UPDATE` | Editar projetos existentes |
 | `PROJECT_MANAGE_MEMBERS` | Gerenciar alocação de usuários em projetos |
@@ -168,7 +190,7 @@ O catálogo é **code-first**: são o vocabulário contra o qual o código verif
 autorização, e por isso não podem ser criadas por usuário. O que é totalmente
 data-driven é *quais* permissões cada perfil possui.
 
-29 permissões ao todo, em 6 módulos.
+31 permissões ao todo, em 6 módulos.
 
 ---
 
@@ -179,6 +201,8 @@ daquele módulo são suas filhas e **não têm efeito sem ela**.
 
 ```
 DEMAND_ACCESS
+  ├── DEMAND_KANBAN                    (tela)
+  ├── DEMAND_LIST                      (tela)
   ├── DEMAND_VIEW_ALL
   ├── DEMAND_CREATE
   ├── DEMAND_UPDATE
@@ -193,6 +217,11 @@ DEMAND_ACCESS
 ```
 
 ### Comportamento
+
+**Exceção única: `PROJECT_ACCESS_ALL`** (`standalone` no catálogo). É uma alocação
+implícita em todo projeto, não um recurso da tela Projetos, então não é filha de
+`PROJECT_ACCESS` — no editor de perfis ela fica marcada e habilitada mesmo com o módulo
+desligado.
 
 **No backend (autoridade).** Se `DEMAND_ACCESS` estiver ausente, todas as filhas do
 módulo tornam-se inefetivas — **mesmo que estejam persistidas**. Uma inconsistência
@@ -236,6 +265,8 @@ restaurados por `npm run db:seed`.
 | Permissão | Administrador | Agilista | Desenvolvedor |
 |---|:---:|:---:|:---:|
 | `DEMAND_ACCESS` | ✅ | ✅ | ✅ |
+| `DEMAND_KANBAN` | ✅ | ✅ | ✅ |
+| `DEMAND_LIST` | ✅ | ✅ | ✅ |
 | `DEMAND_VIEW_ALL` | ✅ | ✅ | ✅ |
 | `DEMAND_CREATE` | ✅ | ✅ | ❌ |
 | `DEMAND_CREATE_WITH_STATUS` | ❌ | ✅ | ❌ |
@@ -266,7 +297,7 @@ restaurados por `npm run db:seed`.
 | `LOG_VIEW_SYSTEM` | ✅ | ❌ | ❌ |
 | `ASSISTANT_ACCESS` | ✅ | ✅ | ✅ |
 | `ASSISTANT_MANAGE` | ✅ | ❌ | ❌ |
-| **Total** | **19** | **12** | **6** |
+| **Total** | **21** | **14** | **8** |
 
 Note que o Administrador **não** possui `DEMAND_UPDATE` (o que também cobre mover cards no
 Kanban), nem `DEMAND_DELETE` nem `DEMAND_BE_ASSIGNEE` — exatamente como o escopo original
@@ -299,7 +330,7 @@ Cada regra funcional do PDF mapeada para a permissão que a implementa:
 | Pode cadastrar demandas | `DEMAND_CREATE` ✅ |
 | **Não** pode editar demandas | `DEMAND_UPDATE` ausente ✅ |
 | **Não** pode excluir demandas | `DEMAND_DELETE` ausente ✅ |
-| Pode acessar o Kanban | `DEMAND_ACCESS` ✅ |
+| Pode acessar o Kanban | `DEMAND_ACCESS` + `DEMAND_KANBAN` ✅ |
 | Pode acessar cards no Kanban | `DEMAND_ACCESS` ✅ |
 
 ### Agilista
@@ -310,7 +341,7 @@ Cada regra funcional do PDF mapeada para a permissão que a implementa:
 | Pode editar demandas | `DEMAND_UPDATE` ✅ |
 | Pode excluir demandas | `DEMAND_DELETE` ✅ |
 | **Não** pode cadastrar usuários | `USER_CREATE` ausente ✅ |
-| Pode acessar o Kanban | `DEMAND_ACCESS` ✅ |
+| Pode acessar o Kanban | `DEMAND_ACCESS` + `DEMAND_KANBAN` ✅ |
 | Pode mover **qualquer** card no Kanban | `DEMAND_UPDATE` + `DEMAND_MANAGE_ALL` ✅ |
 | Pode excluir **qualquer** card no Kanban | `DEMAND_DELETE` + `DEMAND_MANAGE_ALL` ✅ |
 | Pode editar **qualquer** card no Kanban | `DEMAND_UPDATE` + `DEMAND_MANAGE_ALL` ✅ |
@@ -319,7 +350,7 @@ Cada regra funcional do PDF mapeada para a permissão que a implementa:
 
 | Regra do escopo | Permissão |
 |---|---|
-| Pode acessar o Kanban | `DEMAND_ACCESS` ✅ |
+| Pode acessar o Kanban | `DEMAND_ACCESS` + `DEMAND_KANBAN` ✅ |
 | Pode mover **suas próprias** cards no Kanban | `DEMAND_UPDATE` ✅ (sem `DEMAND_MANAGE_ALL`, um card alheio responde 403) |
 | Pode acessar cards no Kanban | `DEMAND_ACCESS` ✅ |
 | Pode editar **suas próprias** cards no Kanban | `DEMAND_UPDATE` ✅ (idem) |
@@ -362,6 +393,9 @@ O acesso ao projeto existe quando:
 
 - existe `ProjectMember` ligando usuário e projeto; **ou**
 - o usuário possui `PROJECT_ACCESS_ALL`.
+
+`PROJECT_ACCESS` **não** entra nessa conta: ela abre a tela Projetos, e retirá-la não
+desfaz nenhuma alocação.
 
 Aplicado uniformemente em toda leitura. `DemandAccessGuard.loadAccessible()` é o único
 caminho até uma demanda para leitura, o que impede que um endpoint futuro esqueça o

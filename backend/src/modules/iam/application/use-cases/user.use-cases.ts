@@ -469,6 +469,29 @@ export class UpdateUser {
 }
 
 /**
+ * How many demands `DeleteUser` would delete or archive — counted exactly the way that
+ * cascade selects them, every demand the person holds.
+ *
+ * The confirmation dialog used to count through the demand listing instead, which is
+ * scoped to the *viewer's* demand visibility (DEMAND_ACCESS, DEMAND_VIEW_ALL, allocation).
+ * A profile allowed to exclude users but not to read those demands saw "0" and was offered
+ * only "Excluir" — silently deleting work it was never shown. The count belongs to the
+ * user-management decision, so it is authorized by the same permissions as the exclusion.
+ */
+export class GetUserDeletionImpact {
+  constructor(private readonly demandQueries: DemandQueries) {}
+
+  async execute(actor: Actor, userUuid: string): Promise<{ responsibleDemands: number }> {
+    actor.requireAll(['USER_UPDATE', 'USER_DELETE']);
+    if (!Uuid.isValid(userUuid)) {
+      throw DomainError.notFound('USER_NOT_FOUND', 'Usuário não encontrado.');
+    }
+    const cards = await this.demandQueries.listCards({ responsibleUuid: Uuid.create(userUuid) });
+    return { responsibleDemands: cards.length };
+  }
+}
+
+/**
  * Excludes a user — a soft delete, not a row removed from the database: the account is
  * deactivated (`active: false`, the same flag `UpdateUser` flips) and kept, exactly like
  * `Project.active`/`Demand.archived` elsewhere in this system. What makes this different

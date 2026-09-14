@@ -95,6 +95,30 @@ export class ListProjects {
   }
 }
 
+/**
+ * The projects the actor works in, as options for demand contexts — the Kanban, Demandas
+ * and Dashboard filters, the project picker of a demand. Gated by DEMAND_ACCESS, not
+ * PROJECT_ACCESS: knowing which projects your own demands belong to is part of working
+ * with demands, and must not depend on also being allowed to open the Projetos screen.
+ * Names only — no members, which remain a Projetos-screen detail.
+ */
+export class ListReachableProjects {
+  constructor(
+    private readonly projects: ProjectRepository,
+    private readonly access: ProjectAccessResolver,
+  ) {}
+
+  async execute(actor: Actor): Promise<ProjectDTO[]> {
+    actor.require('DEMAND_ACCESS');
+    const policy = await this.access.forActor(actor);
+    const projects = await this.projects.list({
+      activeOnly: true,
+      restrictToUuids: policy.visibleProjectUuids(actor),
+    });
+    return projects.map((project) => toDTO(project));
+  }
+}
+
 export class GetProject {
   constructor(
     private readonly projects: ProjectRepository,

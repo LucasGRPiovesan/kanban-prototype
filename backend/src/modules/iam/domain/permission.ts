@@ -6,8 +6,10 @@ import { DomainError } from '../../../shared/domain/errors';
  * What IS data-driven is which permissions a role holds — that is fully editable.
  */
 export const PERMISSION_CODES = [
-  // Demands (covers the Kanban board — it is a view over demands, not a module of its own)
+  // Demands
   'DEMAND_ACCESS',
+  'DEMAND_KANBAN',
+  'DEMAND_LIST',
   'DEMAND_VIEW_ALL',
   'DEMAND_CREATE',
   'DEMAND_CREATE_WITH_STATUS',
@@ -77,6 +79,14 @@ export interface PermissionDefinition {
    * the matching use case would show a relationship the server does not actually enforce.
    */
   readonly dependsOn?: PermissionCode;
+  /**
+   * Not governed by its module's `ACCESS`. Reserved for a grant that is *data scope*
+   * rather than a feature of the module's screen — `PROJECT_ACCESS_ALL` is an implicit
+   * allocation to every project, and allocation must keep working for demands, the
+   * dashboard, logs and notifications when the Projetos screen itself is turned off.
+   * Listed under the module whose data it widens, but never inert without its ACCESS.
+   */
+  readonly standalone?: true;
 }
 
 /**
@@ -84,11 +94,13 @@ export interface PermissionDefinition {
  * that module is a child of it and is inert without it — see PermissionSet.
  */
 export const PERMISSION_CATALOG: readonly PermissionDefinition[] = [
-  // Acessar demandas e seus detalhes covers both the Kanban board and the demand list —
-  // the board is a view over demands, not a capability of its own. Splitting them used
-  // to require both to be granted together for the board route to do anything, which was
-  // a distinction without a difference.
-  { code: 'DEMAND_ACCESS', module: 'DEMAND', action: 'ACCESS', description: 'Acessar demandas e seus detalhes, incluindo o quadro Kanban' },
+  // The data capability: reading a demand wherever it shows up — its details panel,
+  // comments and history, the Dashboard, notifications, the assistant. The two screens
+  // that list demands are children of it, so either can be withheld without the other:
+  // a profile can work from the Kanban without the Demandas history, or the reverse.
+  { code: 'DEMAND_ACCESS', module: 'DEMAND', action: 'ACCESS', description: 'Acessar demandas e seus detalhes (painel da demanda, Dashboard e notificações)' },
+  { code: 'DEMAND_KANBAN', module: 'DEMAND', action: 'KANBAN', description: 'Acessar o quadro Kanban' },
+  { code: 'DEMAND_LIST', module: 'DEMAND', action: 'LIST', description: 'Acessar a tela Demandas (histórico e listagem completa)' },
   // Widens *what* is listed, never *where*: project allocation still applies on top of
   // it. Without this permission the actor reads exactly the demands assigned to them —
   // the board becomes their own work queue rather than the team's. It is deliberately
@@ -160,8 +172,11 @@ export const PERMISSION_CATALOG: readonly PermissionDefinition[] = [
   // administrative edit, just one that also asks what happens to their demands.
   { code: 'USER_DELETE', module: 'USER', action: 'DELETE', description: 'Excluir usuários (soft delete)', dependsOn: 'USER_UPDATE' },
 
-  { code: 'PROJECT_ACCESS', module: 'PROJECT', action: 'ACCESS', description: 'Acessar projetos dos quais participa' },
-  { code: 'PROJECT_ACCESS_ALL', module: 'PROJECT', action: 'ACCESS_ALL', description: 'Acessar todos os projetos, independente de alocação' },
+  // The Projetos screen only. Being allocated to a project is data (project_members), not
+  // this permission: demands, the dashboard, logs and notifications follow allocation
+  // whether or not the profile may open the Projetos screen — see ProjectAccessPolicy.
+  { code: 'PROJECT_ACCESS', module: 'PROJECT', action: 'ACCESS', description: 'Acessar a tela Projetos (projetos dos quais participa)' },
+  { code: 'PROJECT_ACCESS_ALL', module: 'PROJECT', action: 'ACCESS_ALL', description: 'Participar de todos os projetos, sem precisar de alocação (vale para demandas, Dashboard, logs e a tela Projetos)', standalone: true },
   { code: 'PROJECT_CREATE', module: 'PROJECT', action: 'CREATE', description: 'Cadastrar novos projetos' },
   { code: 'PROJECT_UPDATE', module: 'PROJECT', action: 'UPDATE', description: 'Editar projetos existentes' },
   { code: 'PROJECT_MANAGE_MEMBERS', module: 'PROJECT', action: 'MANAGE_MEMBERS', description: 'Gerenciar alocação de usuários em projetos' },

@@ -18,10 +18,9 @@ const me = vi.fn();
 
 vi.mock('@/lib/api/endpoints', () => ({
   authApi: { me: (...args: unknown[]) => me(...args) },
-  projectsApi: {
-    list: (...args: unknown[]) => list(...args),
-  },
   demandsApi: {
+    // The form's project options come from the demands module, not the Projetos screen.
+    projects: (...args: unknown[]) => list(...args),
     create: (...args: unknown[]) => create(...args),
     // Scoped to a project when one is chosen, unscoped when none is — the form asks the
     // server either way rather than filtering a list it already holds.

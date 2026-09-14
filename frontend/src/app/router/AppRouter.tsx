@@ -1,7 +1,7 @@
 import { Suspense, lazy } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppLayout } from '@/app/layouts/AppLayout';
-import { ModuleAccessGuard, ProtectedRoute } from '@/app/router/guards';
+import { KanbanRouteGuard, ModuleAccessGuard, ProtectedRoute } from '@/app/router/guards';
 import { FullPageLoader } from '@/components/ui/FullPageLoader';
 import { LoginPage } from '@/features/auth/LoginPage';
 
@@ -75,16 +75,16 @@ export function AppRouter() {
         <Route
           path="/kanban"
           element={
-            <ModuleAccessGuard permissions={['DEMAND_ACCESS']}>
+            <KanbanRouteGuard>
               <KanbanPage />
-            </ModuleAccessGuard>
+            </KanbanRouteGuard>
           }
         />
 
         <Route
           path="/demandas"
           element={
-            <ModuleAccessGuard permissions={['DEMAND_ACCESS']}>
+            <ModuleAccessGuard permissions={['DEMAND_ACCESS', 'DEMAND_LIST']}>
               <DemandsListPage />
             </ModuleAccessGuard>
           }

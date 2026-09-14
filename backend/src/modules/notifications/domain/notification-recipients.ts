@@ -84,8 +84,8 @@ export function canStillWatch(watcher: WatcherCandidate, demandHasProject: boole
   }
   if (demandHasProject) {
     const global = permissions.has('PROJECT_ACCESS_ALL');
-    const allocated = permissions.has('PROJECT_ACCESS') && watcher.memberOfProject;
-    if (!global && !allocated) {
+    // Allocation alone, as in ProjectAccessPolicy — not the Projetos screen's PROJECT_ACCESS.
+    if (!global && !watcher.memberOfProject) {
       return false;
     }
   }

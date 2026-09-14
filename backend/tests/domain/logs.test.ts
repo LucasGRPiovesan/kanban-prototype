@@ -130,11 +130,15 @@ describe('LogVisibilityPolicy', () => {
     expect(LogVisibilityPolicy.allowsCategory(member, 'SYSTEM')).toBe(false);
   });
 
-  it('grants nothing through allocations without PROJECT_ACCESS', () => {
+  it('follows allocations without PROJECT_ACCESS — the Projetos screen is not the allocation', () => {
     const visibility = LogVisibilityPolicy.forActor(actorWith(['LOG_ACCESS']), projects);
-    expect(visibility.projectUuids).toEqual([]);
+    expect(visibility.projectUuids).toEqual(projects);
+    expect(LogVisibilityPolicy.allowsCategory(visibility, 'ACTIVITY')).toBe(true);
+  });
+
+  it('sees no project activity when allocated to nothing', () => {
+    const visibility = LogVisibilityPolicy.forActor(actorWith(['LOG_ACCESS']), []);
     expect(LogVisibilityPolicy.seesNothing(visibility)).toBe(true);
-    expect(LogVisibilityPolicy.allowsCategory(visibility, 'ACTIVITY')).toBe(false);
   });
 
   it('opens the wider views by capability, never by profile name', () => {

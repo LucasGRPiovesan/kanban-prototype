@@ -32,6 +32,22 @@ describe('PermissionSet — ACCESS hierarchy', () => {
     expect(set.toArray()).toEqual(['DEMAND_ACCESS']);
   });
 
+  it('keeps a standalone scope grant without its module ACCESS', () => {
+    // PROJECT_ACCESS_ALL is an implicit allocation to every project, not a Projetos-screen
+    // feature: turning the screen off must not shrink what the profile's demands reach.
+    const set = PermissionSet.fromCodes(['DEMAND_ACCESS', 'PROJECT_ACCESS_ALL', 'PROJECT_CREATE']);
+    expect(set.has('PROJECT_ACCESS_ALL')).toBe(true);
+    expect(set.has('PROJECT_CREATE')).toBe(false);
+    expect(PermissionSet.normalize(['PROJECT_ACCESS_ALL'])).toEqual(['PROJECT_ACCESS_ALL']);
+  });
+
+  it('treats the Kanban and Demandas screens as independent children of DEMAND_ACCESS', () => {
+    const kanbanOnly = PermissionSet.fromCodes(['DEMAND_ACCESS', 'DEMAND_KANBAN']);
+    expect(kanbanOnly.has('DEMAND_KANBAN')).toBe(true);
+    expect(kanbanOnly.has('DEMAND_LIST')).toBe(false);
+    expect(PermissionSet.fromCodes(['DEMAND_KANBAN', 'DEMAND_LIST']).toArray()).toEqual([]);
+  });
+
   it('reports module access independently of the effective view', () => {
     const set = PermissionSet.fromCodes(['USER_ACCESS']);
     expect(set.hasModuleAccess('USER')).toBe(true);
