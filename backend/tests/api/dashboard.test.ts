@@ -53,15 +53,23 @@ afterAll(async () => {
 });
 
 describe('Dashboard', () => {
-  it('counts exactly the demands the actor can list, with consistent totals', async () => {
-    for (const session of [cookie.admin, cookie.dev]) {
+  it('counts exactly the demands in scope — the board for the team, own responsibility for personal', async () => {
+    for (const [session, ownerUuid] of [
+      [cookie.admin, null],
+      [cookie.dev, SEED_UUIDS.users.lucasBarbosa],
+    ] as const) {
       const [dashboard, demands] = await Promise.all([
         request(app).get(`${API}/dashboard`).set('Cookie', session),
+        // The board's own listing: non-archived demands only, like the dashboard.
         request(app).get(`${API}/demands`).set('Cookie', session),
       ]);
       expect(dashboard.status).toBe(200);
       const data = dashboard.body.data;
-      expect(data.summary.total).toBe(demands.body.data.length);
+      const expected = (demands.body.data as { responsible: { uuid: string } }[]).filter(
+        (demand) => ownerUuid === null || demand.responsible.uuid === ownerUuid,
+      );
+      expect(data.scope.kind).toBe(ownerUuid === null ? 'team' : 'personal');
+      expect(data.summary.total).toBe(expected.length);
       expect(
         data.statusDistribution.reduce((sum: number, entry: { count: number }) => sum + entry.count, 0),
       ).toBe(data.summary.total);
@@ -78,6 +86,30 @@ describe('Dashboard', () => {
     expect(response.body.data.summary.overdue).toBeGreaterThanOrEqual(2);
     expect(response.body.data.attention.length).toBeGreaterThanOrEqual(2);
     expect(response.body.data.flow.throughput.current).toBeGreaterThanOrEqual(1);
+  });
+
+  it('keeps the team indicators behind DASHBOARD_VIEW_ALL', async () => {
+    const devTeam = await request(app).get(`${API}/dashboard`).query({ scope: 'team' }).set('Cookie', cookie.dev);
+    expect(devTeam.status).toBe(403);
+    expect(devTeam.body.error.code).toBe('DASHBOARD_SCOPE_DENIED');
+
+    const adminPersonal = await request(app)
+      .get(`${API}/dashboard`)
+      .query({ scope: 'personal' })
+      .set('Cookie', cookie.admin);
+    expect(adminPersonal.status).toBe(200);
+    expect(adminPersonal.body.data.scope.available).toEqual(['team', 'personal']);
+  });
+
+  it('refuses the screen without any scope permission', async () => {
+    const restore = await revokeTemporarily(prisma, 'desenvolvedor', 'DASHBOARD_VIEW_OWN');
+    try {
+      const response = await request(app).get(`${API}/dashboard`).set('Cookie', cookie.dev);
+      expect(response.status).toBe(403);
+      expect(response.body.error.code).toBe('DASHBOARD_NO_SCOPE');
+    } finally {
+      await restore();
+    }
   });
 
   it("limits a developer to the projects he is allocated to", async () => {

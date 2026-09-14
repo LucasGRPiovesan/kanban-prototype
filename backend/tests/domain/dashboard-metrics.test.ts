@@ -201,4 +201,44 @@ describe('computeDashboard — delivery flow', () => {
     expect(result.flow.leadTimeDays).toEqual({ median: null, p85: null, sample: 0 });
     expect(result.flow.onTime.rate).toBeNull();
   });
+
+  it('starts the cycle at the first started column, not only IN_PROGRESS', () => {
+    const result = computeDashboard({
+      demands: [
+        demand('R', 'PRODUCTION', '2026-09-30', '2026-08-20T12:00:00Z'),
+        demand('S', 'PRODUCTION', '2026-09-30', '2026-08-20T12:00:00Z'),
+      ],
+      transitions: [
+        // Straight to review: work started on 1 Sep.
+        move('R', 'IN_REVIEW', '2026-09-01T12:00:00Z'),
+        move('R', 'PRODUCTION', '2026-09-05T12:00:00Z'),
+        // Straight to production: no start, so no cycle time — never a zero.
+        move('S', 'PRODUCTION', '2026-09-05T12:00:00Z'),
+      ],
+      projects: [p1],
+      now: NOW,
+      timeZone: TZ,
+      periodDays: 30,
+    });
+    expect(result.flow.throughput.current).toBe(2);
+    expect(result.flow.cycleTimeDays).toEqual({ median: 4, p85: 4, sample: 1 });
+  });
+});
+
+describe('Status history read from the activity log', () => {
+  it('reads a status change recorded inside a general edit', async () => {
+    const { statusChangeOf, initialStatusOf } = await import(
+      '../../src/modules/logs/infrastructure/prisma-demand-flow.queries'
+    );
+    // What the edit form records when title and status change in one save.
+    expect(
+      statusChangeOf([
+        { field: 'title', from: 'A', to: 'B' },
+        { field: 'status', from: 'IN_REVIEW', to: 'PRODUCTION' },
+      ]),
+    ).toEqual({ from: 'IN_REVIEW', to: 'PRODUCTION' });
+    // Created directly in a column: that column was entered at creation.
+    expect(initialStatusOf({ status: 'IN_PROGRESS', priority: 'HIGH' })).toEqual({ from: null, to: 'IN_PROGRESS' });
+    expect(initialStatusOf({ status: 'NOT_STARTED' })).toBeNull();
+  });
 });

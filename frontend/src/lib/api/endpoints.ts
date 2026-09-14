@@ -6,6 +6,7 @@ import type {
   AssistantStatus,
   Dashboard,
   DashboardPeriod,
+  DashboardScope,
   Demand,
   DemandAttachment,
   DemandComment,
@@ -268,9 +269,9 @@ export const logsApi = {
 };
 
 export const dashboardApi = {
-  get: (query: { projectUuid?: string; period: DashboardPeriod }) =>
+  get: (query: { projectUuid?: string; period: DashboardPeriod; scope?: DashboardScope }) =>
     api.get<Dashboard>(
-      `/dashboard${toQuery({ projectUuid: query.projectUuid, period: query.period })}`,
+      `/dashboard${toQuery({ projectUuid: query.projectUuid, period: query.period, scope: query.scope })}`,
     ),
 };
 

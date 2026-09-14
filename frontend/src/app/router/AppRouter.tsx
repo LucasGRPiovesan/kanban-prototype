@@ -66,7 +66,10 @@ export function AppRouter() {
         <Route
           path="/dashboard"
           element={
-            <ModuleAccessGuard permissions={['DEMAND_ACCESS']}>
+            <ModuleAccessGuard
+              permissions={['DEMAND_ACCESS', 'DASHBOARD_ACCESS']}
+              anyOf={['DASHBOARD_VIEW_OWN', 'DASHBOARD_VIEW_ALL']}
+            >
               <DashboardPage />
             </ModuleAccessGuard>
           }
@@ -175,17 +178,26 @@ export function AppRouter() {
         />
 
         {/*
-          No permission guard: both are documentation, open to any signed-in profile.
-          The one privileged action inside Integração — generating a project's
-          credentials — is gated on its own, on the Projects screen.
+          Both are static documentation bundled with the app, gated by their own module
+          permission. Generating a project's integration credentials is a separate
+          action, gated on the Projects screen by PROJECT_MANAGE_INTEGRATION.
         */}
-        <Route path="/integracao" element={<IntegrationDocsPage />} />
+        <Route
+          path="/integracao"
+          element={
+            <ModuleAccessGuard permissions={['INTEGRATION_ACCESS']}>
+              <IntegrationDocsPage />
+            </ModuleAccessGuard>
+          }
+        />
         <Route
           path="/documentacao"
           element={
-            <Suspense fallback={<FullPageLoader label="Carregando documentação" />}>
-              <DocsPage />
-            </Suspense>
+            <ModuleAccessGuard permissions={['DOCS_ACCESS']}>
+              <Suspense fallback={<FullPageLoader label="Carregando documentação" />}>
+                <DocsPage />
+              </Suspense>
+            </ModuleAccessGuard>
           }
         />
 

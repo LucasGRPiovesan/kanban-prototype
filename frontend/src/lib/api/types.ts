@@ -24,6 +24,9 @@ export const PERMISSION_CODES = [
   'DEMAND_BE_ASSIGNEE',
   'DEMAND_COMMENT',
   'DEMAND_WATCH',
+  'DASHBOARD_ACCESS',
+  'DASHBOARD_VIEW_OWN',
+  'DASHBOARD_VIEW_ALL',
   'USER_ACCESS',
   'USER_CREATE',
   'USER_UPDATE',
@@ -40,8 +43,10 @@ export const PERMISSION_CODES = [
   'LOG_ACCESS',
   'LOG_VIEW_ORGANIZATION',
   'LOG_VIEW_SYSTEM',
+  'INTEGRATION_ACCESS',
   'ASSISTANT_ACCESS',
   'ASSISTANT_MANAGE',
+  'DOCS_ACCESS',
 ] as const;
 
 export type PermissionCode = (typeof PERMISSION_CODES)[number];
@@ -206,12 +211,20 @@ export interface DashboardDemand {
   responsible: DashboardRef;
 }
 
+export type DashboardScope = 'personal' | 'team';
+
 /** Every date is a calendar date (YYYY-MM-DD) on the server's business calendar. */
 export interface Dashboard {
   generatedAt: string;
   today: string;
   timeZone: string;
-  scope: { projectUuid: string | null };
+  scope: {
+    projectUuid: string | null;
+    /** `personal`: demands the user is responsible for. `team`: every demand they can read. */
+    kind: DashboardScope;
+    /** Scopes this user may switch between, most comprehensive first. */
+    available: DashboardScope[];
+  };
   period: {
     days: DashboardPeriod;
     from: string;

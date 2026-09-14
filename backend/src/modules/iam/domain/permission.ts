@@ -25,6 +25,10 @@ export const PERMISSION_CODES = [
   'DEMAND_BE_ASSIGNEE',
   'DEMAND_COMMENT',
   'DEMAND_WATCH',
+  // Dashboard
+  'DASHBOARD_ACCESS',
+  'DASHBOARD_VIEW_OWN',
+  'DASHBOARD_VIEW_ALL',
   // Users
   'USER_ACCESS',
   'USER_CREATE',
@@ -45,20 +49,27 @@ export const PERMISSION_CODES = [
   'LOG_ACCESS',
   'LOG_VIEW_ORGANIZATION',
   'LOG_VIEW_SYSTEM',
+  // Integration (API documentation screen)
+  'INTEGRATION_ACCESS',
   // Assistant
   'ASSISTANT_ACCESS',
   'ASSISTANT_MANAGE',
+  // Documentation
+  'DOCS_ACCESS',
 ] as const;
 
 export type PermissionCode = (typeof PERMISSION_CODES)[number];
 
 export const PERMISSION_MODULES = [
   'DEMAND',
+  'DASHBOARD',
   'USER',
   'PROJECT',
   'ROLE',
   'LOG',
+  'INTEGRATION',
   'ASSISTANT',
+  'DOCS',
 ] as const;
 export type PermissionModule = (typeof PERMISSION_MODULES)[number];
 
@@ -163,6 +174,17 @@ export const PERMISSION_CATALOG: readonly PermissionDefinition[] = [
   // of changes to their own demands by default.
   { code: 'DEMAND_WATCH', module: 'DEMAND', action: 'WATCH', description: 'Ativar notificações de qualquer demanda que puder acessar' },
 
+  // The screen. It shows nothing by itself: what it measures is decided by the two scope
+  // permissions below — at least one of them is required to open it.
+  { code: 'DASHBOARD_ACCESS', module: 'DASHBOARD', action: 'ACCESS', description: 'Acessar a Dashboard' },
+  // Personal scope: only the demands the signed-in person is responsible for. Granted by
+  // default together with DASHBOARD_ACCESS, so everyone can follow their own delivery.
+  { code: 'DASHBOARD_VIEW_OWN', module: 'DASHBOARD', action: 'VIEW_OWN', description: 'Visualizar indicadores pessoais (demandas sob sua responsabilidade)' },
+  // Team scope: every demand the person can read. Never implied by anything — reading
+  // consolidated delivery indicators is a management decision granted on purpose. It
+  // still never widens *which* demands are counted beyond DEMAND_VIEW_ALL and allocation.
+  { code: 'DASHBOARD_VIEW_ALL', module: 'DASHBOARD', action: 'VIEW_ALL', description: 'Visualizar indicadores consolidados da equipe (todas as demandas visíveis)' },
+
   { code: 'USER_ACCESS', module: 'USER', action: 'ACCESS', description: 'Acessar a gestão de usuários' },
   { code: 'USER_CREATE', module: 'USER', action: 'CREATE', description: 'Cadastrar novos usuários' },
   { code: 'USER_UPDATE', module: 'USER', action: 'UPDATE', description: 'Editar usuários existentes' },
@@ -193,12 +215,18 @@ export const PERMISSION_CATALOG: readonly PermissionDefinition[] = [
   { code: 'LOG_VIEW_ORGANIZATION', module: 'LOG', action: 'VIEW_ORGANIZATION', description: 'Ver atividade administrativa: usuários, perfis e sessões' },
   { code: 'LOG_VIEW_SYSTEM', module: 'LOG', action: 'VIEW_SYSTEM', description: 'Ver logs de sistema: acessos negados, regras recusadas e erros' },
 
+  // The integration API's documentation screen. Generating a project's credentials is a
+  // separate, project-scoped decision: PROJECT_MANAGE_INTEGRATION, on the Projetos screen.
+  { code: 'INTEGRATION_ACCESS', module: 'INTEGRATION', action: 'ACCESS', description: 'Acessar a documentação da API de integração' },
+
   // Using the assistant sends what the actor can already see to an external model and
   // spends a shared quota — a capability worth granting on purpose. What a suggestion may
   // become stays governed by the demand permissions: a draft turns into a demand only
   // through DEMAND_CREATE, a planned checklist only through DEMAND_UPDATE.
   { code: 'ASSISTANT_ACCESS', module: 'ASSISTANT', action: 'ACCESS', description: 'Usar o assistente de IA (Ação rápida)' },
   { code: 'ASSISTANT_MANAGE', module: 'ASSISTANT', action: 'MANAGE', description: 'Ativar o assistente de IA, escolher o modelo e trocar a chave da API' },
+
+  { code: 'DOCS_ACCESS', module: 'DOCS', action: 'ACCESS', description: 'Acessar a documentação do sistema' },
 ];
 
 const BY_CODE = new Map<PermissionCode, PermissionDefinition>(

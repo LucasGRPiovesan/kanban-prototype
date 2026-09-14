@@ -55,13 +55,16 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
  */
 export function ModuleAccessGuard({
   permissions,
+  anyOf,
   children,
 }: {
   permissions: PermissionCode[];
+  /** Additionally requires at least one of these. */
+  anyOf?: PermissionCode[];
   children: React.ReactNode;
 }) {
-  const { canEvery } = useAuth();
-  if (!canEvery(permissions)) {
+  const { canEvery, canSome } = useAuth();
+  if (!canEvery(permissions) || (anyOf && !canSome(anyOf))) {
     return <Navigate to="/" replace />;
   }
   return <>{children}</>;
@@ -76,12 +79,19 @@ export function ModuleAccessGuard({
  * it does have — Demandas, or else the Dashboard — instead of being bounced home.
  */
 export function KanbanRouteGuard({ children }: { children: React.ReactNode }) {
-  const { canEvery } = useAuth();
+  const { canEvery, canSome } = useAuth();
   const [params] = useSearchParams();
   const demand = params.get('demanda');
 
   if (!canEvery(['DEMAND_KANBAN']) && demand && canEvery(['DEMAND_ACCESS'])) {
-    const screen = canEvery(['DEMAND_LIST']) ? '/demandas' : '/dashboard';
+    const screen = canEvery(['DEMAND_LIST'])
+      ? '/demandas'
+      : canEvery(['DASHBOARD_ACCESS']) && canSome(['DASHBOARD_VIEW_OWN', 'DASHBOARD_VIEW_ALL'])
+        ? '/dashboard'
+        : null;
+    if (!screen) {
+      return <Navigate to="/" replace />;
+    }
     return <Navigate to={`${screen}?demanda=${encodeURIComponent(demand)}`} replace />;
   }
   return (

@@ -490,6 +490,8 @@ export class RunAssistantCommand {
           ? undefined
           : state.actor.userUuid.toString(),
         projectUuid: state.scope.project ? Uuid.create(state.scope.project.uuid) : undefined,
+        // Archived demands are off the board; reports must not cite them as open work.
+        archived: false,
       });
       const transitions = await this.deps.flow.statusTransitions(cards.map((card) => card.uuid));
       return buildBoardContext({
@@ -537,7 +539,7 @@ export class RunAssistantCommand {
   ): Promise<AssistantAnswerDTO> {
     const [board, dashboard] = await Promise.all([
       this.board(state),
-      this.deps.dashboard.execute(state.actor, {
+      this.deps.dashboard.forAssistant(state.actor, {
         projectUuid: state.scope.project?.uuid,
         periodDays: 30,
       }),
@@ -761,6 +763,9 @@ function describeIndicators(dashboard: DashboardDTO): string {
       : `mediana ${decimal(distribution.median)} dias, p85 ${decimal(distribution.p85)} dias (${plural(distribution.sample, 'entrega', 'entregas')})`;
 
   const lines = [
+    dashboard.scope.kind === 'personal'
+      ? 'Escopo dos indicadores: pessoais — apenas as demandas sob responsabilidade de quem pergunta (o perfil não visualiza indicadores consolidados da equipe).'
+      : 'Escopo dos indicadores: consolidados de todas as demandas visíveis para quem pergunta.',
     `Período: últimos ${dashboard.period.days} dias (${formatDayMonth(dashboard.period.from)} a ${formatDayMonth(dashboard.period.to)}), comparado aos ${dashboard.period.days} dias anteriores.`,
     `Em aberto: ${summary.open} | atrasadas: ${summary.overdue} | vencem hoje: ${summary.dueToday} | vencem em até 7 dias: ${summary.dueSoon} | paradas há 7+ dias no mesmo status: ${summary.stale} | entregues no total: ${summary.delivered}`,
     `Entregas no período: ${flow.throughput.current} (período anterior: ${flow.throughput.previous}) | novas demandas: ${flow.arrivals.current} (período anterior: ${flow.arrivals.previous})`,

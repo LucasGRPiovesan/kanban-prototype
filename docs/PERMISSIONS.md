@@ -190,7 +190,42 @@ O catálogo é **code-first**: são o vocabulário contra o qual o código verif
 autorização, e por isso não podem ser criadas por usuário. O que é totalmente
 data-driven é *quais* permissões cada perfil possui.
 
-31 permissões ao todo, em 6 módulos.
+### Dashboard
+
+| Código | Descrição |
+|---|---|
+| `DASHBOARD_ACCESS` | Acessar a Dashboard |
+| `DASHBOARD_VIEW_OWN` | Visualizar indicadores pessoais (demandas sob sua responsabilidade) |
+| `DASHBOARD_VIEW_ALL` | Visualizar indicadores consolidados da equipe (todas as demandas visíveis) |
+
+`DASHBOARD_ACCESS` abre a tela; o que ela mede é decidido pelas duas permissões de escopo,
+e ao menos uma delas é exigida (`403 DASHBOARD_NO_SCOPE` sem nenhuma). Com as duas, a tela
+oferece a alternância **Equipe / Minhas demandas**. O escopo da equipe nunca amplia *quais*
+demandas são contadas além do que `DEMAND_ACCESS`, `DEMAND_VIEW_ALL` e a alocação já permitem
+ler; o escopo pessoal conta as demandas não arquivadas das quais a pessoa é responsável.
+Perfis novos nascem com `DASHBOARD_ACCESS` e `DASHBOARD_VIEW_OWN` marcadas;
+`DASHBOARD_VIEW_ALL` é concedida de propósito. Os relatórios do assistente de IA seguem a
+mesma regra de escopo.
+
+### Integração
+
+| Código | Descrição |
+|---|---|
+| `INTEGRATION_ACCESS` | Acessar a documentação da API de integração |
+
+Gerar e revogar as credenciais de um projeto continua sendo `PROJECT_MANAGE_INTEGRATION`,
+na tela Projetos.
+
+### Documentação
+
+| Código | Descrição |
+|---|---|
+| `DOCS_ACCESS` | Acessar a documentação do sistema |
+
+Integração e Documentação são telas estáticas, sem dados do servidor por trás: a permissão
+controla menu e rota.
+
+41 permissões ao todo, em 9 módulos.
 
 ---
 
@@ -277,12 +312,18 @@ restaurados por `npm run db:seed`.
 | `DEMAND_UPDATE_RESPONSIBLE` | ❌ | ✅ | ❌ |
 | `DEMAND_UPDATE_PROJECT` | ❌ | ✅ | ❌ |
 | `DEMAND_MANAGE_PRODUCTION` | ❌ | ✅ | ❌ |
+| `DEMAND_ARCHIVE` | ❌ | ✅ | ❌ |
 | `DEMAND_DELETE` | ❌ | ✅ | ❌ |
 | `DEMAND_BE_ASSIGNEE` | ❌ | ✅ | ✅ |
 | `DEMAND_COMMENT` | ✅ | ✅ | ✅ |
+| `DEMAND_WATCH` | ✅ | ✅ | ❌ |
+| `DASHBOARD_ACCESS` | ✅ | ✅ | ✅ |
+| `DASHBOARD_VIEW_OWN` | ✅ | ✅ | ✅ |
+| `DASHBOARD_VIEW_ALL` | ✅ | ✅ | ❌ |
 | `USER_ACCESS` | ✅ | ❌ | ❌ |
 | `USER_CREATE` | ✅ | ❌ | ❌ |
-| `USER_UPDATE` | ❌ | ❌ | ❌ |
+| `USER_UPDATE` | ✅ | ❌ | ❌ |
+| `USER_DELETE` | ✅ | ❌ | ❌ |
 | `PROJECT_ACCESS` | ✅ | ✅ | ✅ |
 | `PROJECT_ACCESS_ALL` | ✅ | ✅ | ❌ |
 | `PROJECT_CREATE` | ✅ | ❌ | ❌ |
@@ -295,9 +336,11 @@ restaurados por `npm run db:seed`.
 | `LOG_ACCESS` | ✅ | ✅ | ❌ |
 | `LOG_VIEW_ORGANIZATION` | ✅ | ❌ | ❌ |
 | `LOG_VIEW_SYSTEM` | ✅ | ❌ | ❌ |
+| `INTEGRATION_ACCESS` | ✅ | ✅ | ✅ |
 | `ASSISTANT_ACCESS` | ✅ | ✅ | ✅ |
 | `ASSISTANT_MANAGE` | ✅ | ❌ | ❌ |
-| **Total** | **21** | **14** | **8** |
+| `DOCS_ACCESS` | ✅ | ✅ | ✅ |
+| **Total** | **30** | **27** | **13** |
 
 Note que o Administrador **não** possui `DEMAND_UPDATE` (o que também cobre mover cards no
 Kanban), nem `DEMAND_DELETE` nem `DEMAND_BE_ASSIGNEE` — exatamente como o escopo original

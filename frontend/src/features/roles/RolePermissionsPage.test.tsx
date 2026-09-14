@@ -87,7 +87,8 @@ describe('RolePermissionsPage', () => {
     expect(update.mock.calls[0]?.[1]).toEqual({
       permissions: ['DEMAND_ACCESS', 'DEMAND_CREATE'],
     });
-    expect(await screen.findByText('Alterações salvas')).toBeInTheDocument();
+    // Confirmed by the system's standard toast, not by a message inside the page.
+    expect(await screen.findByText('Permissões do perfil atualizadas.')).toBeInTheDocument();
   });
 
   /**
@@ -104,7 +105,8 @@ describe('RolePermissionsPage', () => {
     await userEvent.click(target);
 
     await waitFor(() => expect(checkbox('Cadastrar novas demandas')).not.toBeChecked());
-    expect(await screen.findByText('Alteração não salva')).toBeInTheDocument();
+    // The server's own reason, in the error toast.
+    expect(await screen.findByText('Ação não permitida para o seu perfil.')).toBeInTheDocument();
   });
 
   /**

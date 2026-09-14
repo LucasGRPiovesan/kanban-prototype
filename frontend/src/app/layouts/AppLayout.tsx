@@ -40,6 +40,8 @@ interface NavItem {
   icon: LucideIcon;
   /** Module ACCESS permission. Without it the item is absent and the route is closed. */
   permissions: PermissionCode[];
+  /** On top of `permissions`: at least one of these — the Dashboard needs some indicator scope. */
+  anyOf?: PermissionCode[];
   /**
    * Beyond the original specification. Mirrors the modules listed in
    * docs/ADDED_REQUIREMENTS.md — the Kanban, user registration and demand registration
@@ -72,8 +74,8 @@ export const NAV_ITEMS: NavItem[] = [
     to: '/dashboard',
     label: 'Dashboard',
     icon: LayoutDashboard,
-    // A reading of the demands the user can already list — no new capability to grant.
-    permissions: ['DEMAND_ACCESS'],
+    permissions: ['DEMAND_ACCESS', 'DASHBOARD_ACCESS'],
+    anyOf: ['DASHBOARD_VIEW_OWN', 'DASHBOARD_VIEW_ALL'],
     badge: 'Melhoria',
   },
   {
@@ -95,16 +97,16 @@ export const NAV_ITEMS: NavItem[] = [
     to: '/integracao',
     label: 'Integração',
     icon: Plug,
-    // Documentation, open to anyone signed in; generating a project's own credentials
-    // is gated separately, on the Projects screen, by PROJECT_MANAGE_INTEGRATION.
-    permissions: [],
+    // The API documentation; generating a project's own credentials is gated separately,
+    // on the Projects screen, by PROJECT_MANAGE_INTEGRATION.
+    permissions: ['INTEGRATION_ACCESS'],
     badge: 'Sugestão',
   },
   {
     to: '/documentacao',
     label: 'Documentação',
     icon: BookOpen,
-    permissions: [],
+    permissions: ['DOCS_ACCESS'],
   },
 ];
 
@@ -121,7 +123,7 @@ function readCollapsed(): boolean {
 }
 
 export function AppLayout() {
-  const { session, logout, canEvery } = useAuth();
+  const { session, logout, canEvery, canSome } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -142,7 +144,9 @@ export function AppLayout() {
     }
   }, [collapsed]);
 
-  const visibleItems = NAV_ITEMS.filter((item) => canEvery(item.permissions));
+  const visibleItems = NAV_ITEMS.filter(
+    (item) => canEvery(item.permissions) && (!item.anyOf || canSome(item.anyOf)),
+  );
 
   const handleLogout = async () => {
     await logout();

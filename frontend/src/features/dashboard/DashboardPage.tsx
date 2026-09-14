@@ -25,7 +25,7 @@ import { useProjects } from '@/features/kanban/useDemands';
 import { dashboardApi } from '@/lib/api/endpoints';
 import { cn } from '@/lib/cn';
 import { projectLabel } from '@/features/demands/project';
-import type { Dashboard, DashboardDemand, DashboardPeriod } from '@/lib/api/types';
+import type { Dashboard, DashboardDemand, DashboardPeriod, DashboardScope } from '@/lib/api/types';
 import { ProportionBar, StatusBars, WeeklyFlowChart, WorkloadBars } from './charts';
 import {
   DUE_BUCKETS,
@@ -39,7 +39,8 @@ import {
 
 export const dashboardKeys = {
   all: ['dashboard'] as const,
-  view: (projectUuid: string, period: DashboardPeriod) => ['dashboard', projectUuid || 'all', period] as const,
+  view: (projectUuid: string, period: DashboardPeriod, scope: DashboardScope | 'default') =>
+    ['dashboard', projectUuid || 'all', period, scope] as const,
 };
 
 const PERIODS: DashboardPeriod[] = [30, 90];
@@ -66,6 +67,13 @@ export function DashboardPage() {
   const projectUuid = params.get('projeto') ?? '';
   const period: DashboardPeriod = params.get('periodo') === '90' ? 90 : 30;
   const openDemand = params.get('demanda');
+  // Absent means "the widest view my profile allows" — the server resolves it.
+  const requestedScope: DashboardScope | undefined =
+    params.get('visao') === 'pessoal'
+      ? 'personal'
+      : params.get('visao') === 'equipe'
+        ? 'team'
+        : undefined;
 
   const update = useCallback(
     (changes: Record<string, string | null>) => {
@@ -86,8 +94,9 @@ export function DashboardPage() {
 
   const projects = useProjects();
   const dashboard = useQuery({
-    queryKey: dashboardKeys.view(projectUuid, period),
-    queryFn: () => dashboardApi.get({ projectUuid: projectUuid || undefined, period }),
+    queryKey: dashboardKeys.view(projectUuid, period, requestedScope ?? 'default'),
+    queryFn: () =>
+      dashboardApi.get({ projectUuid: projectUuid || undefined, period, scope: requestedScope }),
     // A filter change keeps the current numbers on screen, dimmed, instead of a
     // skeleton flash — the layout never jumps under the reader.
     placeholderData: keepPreviousData,
@@ -102,6 +111,7 @@ export function DashboardPage() {
   };
 
   const data = dashboard.data;
+  const personal = data?.scope.kind === 'personal';
 
   return (
     <PageShell wide>
@@ -109,7 +119,11 @@ export function DashboardPage() {
         <PageHeader
           title="Dashboard"
           badge={<EnhancementBadge />}
-          description="A situação das demandas dos seus projetos e como elas estão chegando à produção."
+          description={
+            personal
+              ? 'Seus indicadores: a situação das demandas sob sua responsabilidade e como elas estão chegando à produção.'
+              : 'A situação das demandas dos seus projetos e como elas estão chegando à produção.'
+          }
           crumbs={[{ label: 'Home', to: '/' }, { label: 'Dashboard' }]}
         />
 
@@ -120,7 +134,10 @@ export function DashboardPage() {
               aria-label="Projeto"
               options={[
                 { value: '', label: 'Todos os projetos' },
-                ...(projects.data ?? []).map((project) => ({ value: project.uuid, label: project.name })),
+                ...(projects.data ?? []).map((project) => ({
+                  value: project.uuid,
+                  label: project.name,
+                })),
               ]}
               value={projectUuid}
               onChange={(value) => update({ projeto: value || null })}
@@ -128,10 +145,29 @@ export function DashboardPage() {
               emptyMessage="Projeto não encontrado"
             />
           </div>
-          <PeriodToggle value={period} onChange={(value) => update({ periodo: value === 30 ? null : String(value) })} />
+          {data && data.scope.available.length > 1 && (
+            <ScopeToggle
+              value={data.scope.kind}
+              onChange={(value) =>
+                update({
+                  visao:
+                    value === data.scope.available[0]
+                      ? null
+                      : value === 'team'
+                        ? 'equipe'
+                        : 'pessoal',
+                })
+              }
+            />
+          )}
+          <PeriodToggle
+            value={period}
+            onChange={(value) => update({ periodo: value === 30 ? null : String(value) })}
+          />
           {data && (
             <p className="text-xs text-subtle sm:ml-auto">
-              Posição de {formatFullDate(data.today)}, no calendário {data.timeZone.replace('_', ' ')}
+              Posição de {formatFullDate(data.today)}, no calendário{' '}
+              {data.timeZone.replace('_', ' ')}
             </p>
           )}
         </div>
@@ -144,7 +180,11 @@ export function DashboardPage() {
                 ? 'O projeto selecionado pode não existir mais ou não estar acessível para você.'
                 : 'Tente novamente em instantes.'
             }
-            onRetry={() => (projectUuid ? update({ projeto: null }) : void dashboard.refetch())}
+            onRetry={() =>
+              projectUuid || requestedScope
+                ? update({ projeto: null, visao: null })
+                : void dashboard.refetch()
+            }
           />
         )}
 
@@ -154,8 +194,16 @@ export function DashboardPage() {
           <div className="card-surface">
             <EmptyState
               icon={<Inbox className="h-6 w-6" />}
-              title="Nenhuma demanda para medir ainda"
-              description="Assim que houver demandas nos seus projetos, a situação delas aparece aqui."
+              title={
+                personal
+                  ? 'Nenhuma demanda sob sua responsabilidade'
+                  : 'Nenhuma demanda para medir ainda'
+              }
+              description={
+                personal
+                  ? 'Assim que uma demanda for atribuída a você, seus indicadores aparecem aqui.'
+                  : 'Assim que houver demandas nos seus projetos, a situação delas aparece aqui.'
+              }
               action={
                 can('DEMAND_CREATE') ? (
                   <Link to="/demandas/nova" className={buttonClasses('primary', 'sm')}>
@@ -169,7 +217,10 @@ export function DashboardPage() {
 
         {data && data.summary.total > 0 && (
           <div
-            className={cn('space-y-6 transition-opacity duration-200', dashboard.isPlaceholderData && 'opacity-60')}
+            className={cn(
+              'space-y-6 transition-opacity duration-200',
+              dashboard.isPlaceholderData && 'opacity-60',
+            )}
             aria-busy={dashboard.isFetching}
           >
             <Situation data={data} />
@@ -229,13 +280,21 @@ export function DashboardPage() {
               </Panel>
             </div>
 
-            <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)]">
-              <Panel
-                title="Carga por responsável"
-                description="Demandas em aberto de cada pessoa, destacando o quanto delas está atrasado ou vence em até 7 dias."
-              >
-                <WorkloadBars workload={data.workload} />
-              </Panel>
+            <div
+              className={cn(
+                'grid gap-6',
+                !personal && 'xl:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)]',
+              )}
+            >
+              {/* One person's own view: a workload breakdown would be a single row — their own. */}
+              {!personal && (
+                <Panel
+                  title="Carga por responsável"
+                  description="Demandas em aberto de cada pessoa, destacando o quanto delas está atrasado ou vence em até 7 dias."
+                >
+                  <WorkloadBars workload={data.workload} />
+                </Panel>
+              )}
               <Panel
                 title="Por projeto"
                 description={`Situação atual e entregas dos últimos ${data.period.days} dias. Clique em um projeto para filtrar a dashboard.`}
@@ -278,14 +337,18 @@ function Situation({ data }: { data: Dashboard }) {
             </span>
             <span className="pb-1.5 text-sm leading-snug text-muted">
               de {summary.open} em aberto
-              <span className="block text-xs text-subtle">{formatPercent(summary.open ? summary.overdue / summary.open : null)} do que está em andamento</span>
+              <span className="block text-xs text-subtle">
+                {formatPercent(summary.open ? summary.overdue / summary.open : null)} do que está em
+                andamento
+              </span>
             </span>
           </p>
         </div>
         {summary.overdue > 0 ? (
           <p className="flex items-start gap-2 rounded-lg border border-danger-border bg-danger-surface px-3 py-2 text-xs font-medium text-body">
             <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0 text-danger" aria-hidden="true" />
-            Passaram do prazo e ainda não estão em produção: precisam de prioridade ou de um novo prazo.
+            Passaram do prazo e ainda não estão em produção: precisam de prioridade ou de um novo
+            prazo.
           </p>
         ) : (
           <p className="flex items-start gap-2 rounded-lg border border-success/30 bg-success-surface px-3 py-2 text-xs font-medium text-body">
@@ -317,7 +380,11 @@ function Situation({ data }: { data: Dashboard }) {
           <MiniStat
             label="Vencem em até 7 dias"
             value={summary.dueSoon}
-            caption={summary.dueToday > 0 ? `${summary.dueToday} ${plural(summary.dueToday, 'vence', 'vencem')} hoje` : 'Nenhuma vence hoje'}
+            caption={
+              summary.dueToday > 0
+                ? `${summary.dueToday} ${plural(summary.dueToday, 'vence', 'vencem')} hoje`
+                : 'Nenhuma vence hoje'
+            }
           />
           <MiniStat
             label="Paradas há 7+ dias"
@@ -344,7 +411,8 @@ function Flow({ data }: { data: Dashboard }) {
           Fluxo de entrega nos últimos {period.days} dias
         </h2>
         <p className="text-xs text-subtle">
-          {formatFullDate(period.from)} a {formatFullDate(period.to)}, comparado aos {period.days} dias anteriores
+          {formatFullDate(period.from)} a {formatFullDate(period.to)}, comparado aos {period.days}{' '}
+          dias anteriores
         </p>
       </div>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
@@ -352,14 +420,20 @@ function Flow({ data }: { data: Dashboard }) {
           icon={<PackageCheck className="h-3.5 w-3.5" />}
           label="Entregas"
           value={String(flow.throughput.current)}
-          delta={{ ...describeDelta(flow.throughput.current, flow.throughput.previous), upIsGood: true }}
+          delta={{
+            ...describeDelta(flow.throughput.current, flow.throughput.previous),
+            upIsGood: true,
+          }}
           caption="Demandas que chegaram à produção no período (vazão)."
         />
         <StatTile
           icon={<Inbox className="h-3.5 w-3.5" />}
           label="Entradas"
           value={String(flow.arrivals.current)}
-          delta={{ ...describeDelta(flow.arrivals.current, flow.arrivals.previous), upIsGood: null }}
+          delta={{
+            ...describeDelta(flow.arrivals.current, flow.arrivals.previous),
+            upIsGood: null,
+          }}
           caption="Demandas criadas no período. Compare com as entregas."
         />
         <StatTile
@@ -454,7 +528,8 @@ function StatTile({
       : (delta.direction === 'up') === delta.upIsGood
         ? 'text-success'
         : 'text-danger';
-  const DeltaIcon = delta?.direction === 'up' ? ArrowUpRight : delta?.direction === 'down' ? ArrowDownRight : Minus;
+  const DeltaIcon =
+    delta?.direction === 'up' ? ArrowUpRight : delta?.direction === 'down' ? ArrowDownRight : Minus;
 
   return (
     <div className="card-surface flex flex-col gap-1.5 p-4">
@@ -511,7 +586,10 @@ function DemandList({
                 onClick={() => onOpen(demand.uuid)}
                 className="group flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors duration-150 hover:bg-surface-muted"
               >
-                <span className={cn('h-8 w-1 shrink-0 rounded-full', status.dotClass)} aria-hidden="true" />
+                <span
+                  className={cn('h-8 w-1 shrink-0 rounded-full', status.dotClass)}
+                  aria-hidden="true"
+                />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-semibold text-body group-hover:underline">
                     {demand.title}
@@ -543,7 +621,8 @@ function DemandList({
           E mais {more}
           {moreScreen && (
             <>
-              {' '}— veja todas no{moreScreen.to === '/demandas' ? 'a' : ''}{' '}
+              {' '}
+              — veja todas no{moreScreen.to === '/demandas' ? 'a' : ''}{' '}
               <Link
                 to={moreScreen.to}
                 className="font-semibold text-brand-700 underline underline-offset-2 hover:text-brand-800"
@@ -582,13 +661,27 @@ function ProjectsTable({
       <table className="w-full min-w-[40rem] text-left text-sm">
         <thead>
           <tr className="border-y border-line bg-surface-muted/60 text-xs text-subtle">
-            <th scope="col" className="px-5 py-2 font-semibold">Projeto</th>
-            <th scope="col" className="px-3 py-2 text-right font-semibold">Em aberto</th>
-            <th scope="col" className="px-3 py-2 text-right font-semibold">Atrasadas</th>
-            <th scope="col" className="px-3 py-2 text-right font-semibold">Vencem em 7 dias</th>
-            <th scope="col" className="px-3 py-2 text-right font-semibold">Paradas</th>
-            <th scope="col" className="px-3 py-2 text-right font-semibold">Entregas</th>
-            <th scope="col" className="px-5 py-2 text-right font-semibold">No prazo</th>
+            <th scope="col" className="px-5 py-2 font-semibold">
+              Projeto
+            </th>
+            <th scope="col" className="px-3 py-2 text-right font-semibold">
+              Em aberto
+            </th>
+            <th scope="col" className="px-3 py-2 text-right font-semibold">
+              Atrasadas
+            </th>
+            <th scope="col" className="px-3 py-2 text-right font-semibold">
+              Vencem em 7 dias
+            </th>
+            <th scope="col" className="px-3 py-2 text-right font-semibold">
+              Paradas
+            </th>
+            <th scope="col" className="px-3 py-2 text-right font-semibold">
+              Entregas
+            </th>
+            <th scope="col" className="px-5 py-2 text-right font-semibold">
+              No prazo
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -610,14 +703,18 @@ function ProjectsTable({
               <td className="px-3 py-2.5 text-right tabular-nums text-body">{row.open}</td>
               <td className="px-3 py-2.5 text-right tabular-nums">
                 <span className="inline-flex items-center justify-end gap-1.5 text-body">
-                  {row.overdue > 0 && <span className="h-1.5 w-1.5 rounded-full bg-danger" aria-hidden="true" />}
+                  {row.overdue > 0 && (
+                    <span className="h-1.5 w-1.5 rounded-full bg-danger" aria-hidden="true" />
+                  )}
                   <span className={row.overdue > 0 ? 'font-bold' : undefined}>{row.overdue}</span>
                 </span>
               </td>
               <td className="px-3 py-2.5 text-right tabular-nums text-body">{row.dueSoon}</td>
               <td className="px-3 py-2.5 text-right tabular-nums text-body">{row.stale}</td>
               <td className="px-3 py-2.5 text-right tabular-nums text-body">{row.delivered}</td>
-              <td className="px-5 py-2.5 text-right tabular-nums text-body">{formatPercent(row.onTimeRate)}</td>
+              <td className="px-5 py-2.5 text-right tabular-nums text-body">
+                {formatPercent(row.onTimeRate)}
+              </td>
             </tr>
           ))}
         </tbody>
@@ -626,7 +723,54 @@ function ProjectsTable({
   );
 }
 
-function PeriodToggle({ value, onChange }: { value: DashboardPeriod; onChange: (value: DashboardPeriod) => void }) {
+const SCOPE_LABELS: Record<DashboardScope, string> = {
+  team: 'Equipe',
+  personal: 'Minhas demandas',
+};
+
+/** Only shown to a profile holding both scope permissions. */
+function ScopeToggle({
+  value,
+  onChange,
+}: {
+  value: DashboardScope;
+  onChange: (value: DashboardScope) => void;
+}) {
+  return (
+    <div
+      role="radiogroup"
+      aria-label="Visão dos indicadores"
+      className="inline-flex rounded-lg border border-line bg-surface p-0.5"
+    >
+      {(['team', 'personal'] as const).map((scope) => {
+        const active = scope === value;
+        return (
+          <button
+            key={scope}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            onClick={() => onChange(scope)}
+            className={cn(
+              'rounded-md px-3 py-1.5 text-xs font-semibold transition-colors duration-150',
+              active ? 'bg-brand-100 text-brand-800' : 'text-muted hover:text-body',
+            )}
+          >
+            {SCOPE_LABELS[scope]}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function PeriodToggle({
+  value,
+  onChange,
+}: {
+  value: DashboardPeriod;
+  onChange: (value: DashboardPeriod) => void;
+}) {
   return (
     <div
       role="radiogroup"

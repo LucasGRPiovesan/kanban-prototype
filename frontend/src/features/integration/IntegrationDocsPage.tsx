@@ -91,14 +91,15 @@ function VisaoGeral() {
         e atualizar demandas de um projeto específico sem que ninguém precise fazer login
         pela interface, contanto que tenha as credenciais daquele projeto.
       </p>
-      <div className="flex items-start gap-3 rounded-lg border border-brand-300 bg-brand-50 p-4">
-        <Plug className="mt-0.5 h-5 w-5 shrink-0 text-brand-700" aria-hidden="true" />
+      {/* Translucent tint, not the fixed pale brand-50: theme text stays readable in dark mode. */}
+      <div className="flex items-start gap-3 rounded-lg border border-brand-500/40 bg-brand-500/10 p-4">
+        <Plug className="mt-0.5 h-5 w-5 shrink-0 text-brand-600" aria-hidden="true" />
         <p className="text-sm text-body">
           As credenciais são geradas <strong>na tela de Projetos</strong>, não aqui — esta
           página é a documentação de como usá-las.{' '}
           <Link
             to="/projetos"
-            className="inline-flex items-center gap-1 font-semibold text-brand-800 underline underline-offset-2"
+            className="inline-flex items-center gap-1 font-semibold text-brand-600 underline underline-offset-2"
           >
             Ir para Projetos <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
           </Link>

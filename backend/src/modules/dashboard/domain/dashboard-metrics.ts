@@ -211,7 +211,11 @@ export function computeDashboard(input: MetricsInput): DashboardMetrics {
     // delivery date: it counts as delivered, but stays out of every time-based metric
     // rather than being given an invented one.
     const deliveredAt = demand.status === 'PRODUCTION' ? (intoCurrent?.occurredAt ?? null) : null;
-    const startedAt = moves.find((move) => move.to === 'IN_PROGRESS')?.occurredAt ?? null;
+    // Work starts the first time the demand enters any started column — not only
+    // IN_PROGRESS: a demand can go straight from NOT_STARTED to IN_REVIEW or PAUSED, and
+    // that is still the moment someone began working on it. A jump straight to production
+    // has no start and stays out of cycle time rather than being measured as zero.
+    const startedAt = moves.find((move) => STARTED_STATUSES.includes(move.to as DemandStatusValue))?.occurredAt ?? null;
     const statusSince = intoCurrent?.occurredAt ?? demand.createdAt;
     const open = demand.status !== 'PRODUCTION';
     const daysToDue = daysBetween(today, demand.dueDate);

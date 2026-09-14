@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Check, CornerDownRight, Loader2, Lock, ShieldCheck, TriangleAlert } from 'lucide-react';
+import { ArrowLeft, CornerDownRight, Lock, ShieldCheck } from 'lucide-react';
 import { buttonClasses } from '@/components/ui/Button';
 import { ErrorState, Skeleton } from '@/components/ui/Feedback';
 import { Field, Input } from '@/components/ui/Field';
@@ -11,9 +11,13 @@ import { ApiError } from '@/lib/api/client';
 import { rolesApi } from '@/lib/api/endpoints';
 import { cn } from '@/lib/cn';
 import type { PermissionCode, PermissionModuleGroup, Role } from '@/lib/api/types';
-import { depthOf, isModuleEnabled, isPermissionEnabled, moduleLabel, togglePermission } from './permissionPolicy';
-
-type SaveState = 'idle' | 'saving' | 'saved' | 'error';
+import {
+  depthOf,
+  isModuleEnabled,
+  isPermissionEnabled,
+  moduleLabel,
+  togglePermission,
+} from './permissionPolicy';
 
 /**
  * Permission editing on its own screen rather than in a dialog.
@@ -24,8 +28,8 @@ type SaveState = 'idle' | 'saving' | 'saved' | 'error';
  *
  * Each checkbox saves on its own. That removes the "did I press Salvar?" question
  * entirely, and it fits what this screen actually is: a switchboard, not a form with a
- * result. What it costs is honesty about state, which is why every write reports itself
- * in the header and a rejected write puts the checkbox back where it was.
+ * result. What it costs is honesty about state, which is why every write is confirmed by
+ * the standard toast and a rejected write puts the checkbox back where it was.
  */
 export function RolePermissionsPage() {
   const { uuid = '' } = useParams();
@@ -108,7 +112,6 @@ function PermissionEditor({
   const [selected, setSelected] = useState<PermissionCode[]>(role.permissions);
   const [name, setName] = useState(role.name);
   const [nameError, setNameError] = useState<string | undefined>();
-  const [saveState, setSaveState] = useState<SaveState>('idle');
 
   /**
    * One request in flight at a time, with the newest intent queued behind it.
@@ -131,7 +134,6 @@ function PermissionEditor({
         return;
       }
       inFlight.current = true;
-      setSaveState('saving');
 
       const payload = role.isSystem
         ? { permissions: next.permissions }
@@ -141,15 +143,24 @@ function PermissionEditor({
         .update(role.uuid, payload)
         .then((updated) => {
           confirmed.current = { permissions: updated.permissions, name: updated.name };
-          setSaveState('saved');
           setNameError(undefined);
+          // The system's standard toast, fixed to the viewport: the confirmation is seen
+          // wherever on this long matrix the click happened. A burst of clicks collapses
+          // into one confirmation, sent once the last queued write lands.
+          if (!queued.current) {
+            notify(
+              next.name !== undefined
+                ? 'Nome do perfil atualizado.'
+                : 'Permissões do perfil atualizadas.',
+              'success',
+            );
+          }
         })
         .catch((error: unknown) => {
           // Put the interface back where the server says it is. Leaving a checkbox
           // ticked after a rejected write is the one outcome worse than no autosave.
           setSelected(confirmed.current.permissions);
           setName(confirmed.current.name);
-          setSaveState('error');
           queued.current = null;
           const message =
             error instanceof ApiError ? error.message : 'Não foi possível salvar a alteração.';
@@ -205,7 +216,6 @@ function PermissionEditor({
           ]}
           actions={
             <div className="flex items-center gap-3">
-              <SaveIndicator state={saveState} />
               <Link to="/perfis" className={buttonClasses('secondary', 'md', 'gap-2')}>
                 <ArrowLeft className="h-4 w-4" aria-hidden="true" />
                 Voltar
@@ -340,48 +350,5 @@ export function StandaloneNote() {
     <span className="mt-0.5 block text-2xs font-medium text-muted">
       Vale mesmo sem acesso à tela deste módulo.
     </span>
-  );
-}
-
-/**
- * Says what happened to the last write.
- *
- * `aria-live="polite"` because it must reach a screen-reader user — with no Save button
- * to press, this indicator is the only confirmation the change was accepted.
- */
-function SaveIndicator({ state }: { state: SaveState }) {
-  if (state === 'idle') {
-    return null;
-  }
-
-  const content = {
-    saving: {
-      icon: <Loader2 className="h-3.5 w-3.5 animate-spin" />,
-      label: 'Salvando…',
-      tone: 'text-muted',
-    },
-    saved: {
-      icon: <Check className="h-3.5 w-3.5" />,
-      label: 'Alterações salvas',
-      tone: 'text-success',
-    },
-    error: {
-      icon: <TriangleAlert className="h-3.5 w-3.5" />,
-      label: 'Alteração não salva',
-      tone: 'text-danger',
-    },
-  }[state];
-
-  return (
-    <p
-      aria-live="polite"
-      className={cn(
-        'flex animate-fade-in items-center gap-1.5 text-xs font-semibold',
-        content.tone,
-      )}
-    >
-      <span aria-hidden="true">{content.icon}</span>
-      {content.label}
-    </p>
   );
 }

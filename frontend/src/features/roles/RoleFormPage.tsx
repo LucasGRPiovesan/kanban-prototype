@@ -40,7 +40,9 @@ export function RoleFormPage() {
   });
 
   const [name, setName] = useState('');
-  const [selected, setSelected] = useState<PermissionCode[]>([]);
+  // Every profile starts with the Dashboard and its personal indicators — the team's
+  // consolidated view, like every other permission, is granted on purpose.
+  const [selected, setSelected] = useState<PermissionCode[]>(['DASHBOARD_ACCESS', 'DASHBOARD_VIEW_OWN']);
   const [nameError, setNameError] = useState<string | undefined>();
 
   const mutation = useMutation({

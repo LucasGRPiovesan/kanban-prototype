@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { CheckCircle2, Info, TriangleAlert, X } from 'lucide-react';
 import { cn } from '@/lib/cn';
 
@@ -56,35 +57,43 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastContext.Provider value={value}>
       {children}
-      <div
-        // Polite: feedback should not interrupt what the user is typing.
-        aria-live="polite"
-        aria-atomic="false"
-        // Below the sticky topbar (z-20), on its leading edge — feedback belongs near
-        // where the action that caused it lives, not tucked in a corner of the screen.
-        className="pointer-events-none fixed right-4 top-[4.5rem] z-[60] flex w-[min(24rem,calc(100vw-2rem))] flex-col gap-2"
-      >
-        {toasts.map((toast) => (
-          <div
-            key={toast.id}
-            className={cn(
-              'pointer-events-auto flex animate-slide-in-right items-start gap-2.5 rounded-xl border border-l-4 border-line px-3.5 py-3 shadow-lifted',
-              TONE_STYLES[toast.tone],
-            )}
-          >
-            <span className="mt-0.5 shrink-0">{TONE_ICONS[toast.tone]}</span>
-            <p className="flex-1 text-sm leading-snug text-body">{toast.message}</p>
-            <button
-              type="button"
-              onClick={() => dismiss(toast.id)}
-              aria-label="Fechar aviso"
-              className="press -mr-1 -mt-1 shrink-0 rounded-md p-1 text-subtle transition-all duration-200 ease-smooth hover:bg-surface-muted hover:text-body"
+      {/*
+        Portaled to <body> and fixed to the viewport: feedback stays in view however far
+        the page is scrolled, and no transformed or scrolling ancestor can ever turn
+        "fixed" back into "scrolls with the content".
+      */}
+      {createPortal(
+        <div
+          // Polite: feedback should not interrupt what the user is typing.
+          aria-live="polite"
+          aria-atomic="false"
+          // Below the sticky topbar (z-20), on its leading edge — feedback belongs near
+          // where the action that caused it lives, not tucked in a corner of the screen.
+          className="pointer-events-none fixed right-4 top-[4.5rem] z-[60] flex w-[min(24rem,calc(100vw-2rem))] flex-col gap-2"
+        >
+          {toasts.map((toast) => (
+            <div
+              key={toast.id}
+              className={cn(
+                'pointer-events-auto flex animate-slide-in-right items-start gap-2.5 rounded-xl border border-l-4 border-line px-3.5 py-3 shadow-lifted',
+                TONE_STYLES[toast.tone],
+              )}
             >
-              <X className="h-3.5 w-3.5" aria-hidden="true" />
-            </button>
-          </div>
-        ))}
-      </div>
+              <span className="mt-0.5 shrink-0">{TONE_ICONS[toast.tone]}</span>
+              <p className="flex-1 text-sm leading-snug text-body">{toast.message}</p>
+              <button
+                type="button"
+                onClick={() => dismiss(toast.id)}
+                aria-label="Fechar aviso"
+                className="press -mr-1 -mt-1 shrink-0 rounded-md p-1 text-subtle transition-all duration-200 ease-smooth hover:bg-surface-muted hover:text-body"
+              >
+                <X className="h-3.5 w-3.5" aria-hidden="true" />
+              </button>
+            </div>
+          ))}
+        </div>,
+        document.body,
+      )}
     </ToastContext.Provider>
   );
 }

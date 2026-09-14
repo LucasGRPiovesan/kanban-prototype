@@ -11,6 +11,7 @@ const query = z.object({
     .enum(['30', '90'], { message: 'Período deve ser 30 ou 90 dias.' })
     .default('30')
     .transform((value) => Number(value) as 30 | 90),
+  scope: z.enum(['personal', 'team'], { message: 'Escopo deve ser personal ou team.' }).optional(),
 });
 
 export interface DashboardPresentationDeps {
@@ -22,12 +23,12 @@ export function createDashboardRouter(deps: DashboardPresentationDeps): Router {
 
   router.get(
     '/',
-    requirePermission('DEMAND_ACCESS'),
+    requirePermission('DEMAND_ACCESS', 'DASHBOARD_ACCESS'),
     asyncHandler(async (req, res) => {
-      const { projectUuid, period } = query.parse(req.query);
+      const { projectUuid, period, scope } = query.parse(req.query);
       return ok(
         res,
-        await deps.getDashboard.execute(currentActor(req), { projectUuid, periodDays: period }),
+        await deps.getDashboard.execute(currentActor(req), { projectUuid, periodDays: period, scope }),
       );
     }),
   );

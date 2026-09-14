@@ -589,8 +589,10 @@
   .prose-docs hr {
     @apply my-8 border-line;
   }
+  /* A translucent brand tint instead of the fixed pale brand-50: it darkens with the page
+     in the dark theme, so the theme text on top of it stays readable in both. */
   .prose-docs blockquote {
-    @apply border-l-2 border-brand-400 bg-brand-50 py-2 pl-4 text-muted;
+    @apply border-l-2 border-brand-400 bg-brand-500/10 py-2 pl-4 text-muted;
   }
   .prose-docs code {
     @apply rounded bg-surface-muted px-1.5 py-0.5 font-mono text-[0.8125rem] text-body;
@@ -614,7 +616,7 @@
     @apply whitespace-nowrap border-b border-line bg-surface-muted px-3 py-2 font-semibold text-subtle;
   }
   .prose-docs td {
-    @apply border-b border-line px-3 py-2 align-top last:w-full;
+    @apply border-b border-line px-3 py-2 align-top;
   }
   .prose-docs tr:last-child td {
     @apply border-0;

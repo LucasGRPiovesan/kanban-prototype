@@ -48,6 +48,13 @@ export const SYSTEM_ROLES = [
       'DEMAND_ACCESS',
       'DEMAND_KANBAN',
       'DEMAND_LIST',
+      // Every profile gets the Dashboard with its own indicators; the team's consolidated
+      // view (DASHBOARD_VIEW_ALL) is granted only where following delivery is the job.
+      'DASHBOARD_ACCESS',
+      'DASHBOARD_VIEW_OWN',
+      'DASHBOARD_VIEW_ALL',
+      'INTEGRATION_ACCESS',
+      'DOCS_ACCESS',
       'DEMAND_VIEW_ALL',
       'DEMAND_CREATE',
       'USER_ACCESS',
@@ -80,6 +87,13 @@ export const SYSTEM_ROLES = [
       'DEMAND_ACCESS',
       'DEMAND_KANBAN',
       'DEMAND_LIST',
+      // Every profile gets the Dashboard with its own indicators; the team's consolidated
+      // view (DASHBOARD_VIEW_ALL) is granted only where following delivery is the job.
+      'DASHBOARD_ACCESS',
+      'DASHBOARD_VIEW_OWN',
+      'DASHBOARD_VIEW_ALL',
+      'INTEGRATION_ACCESS',
+      'DOCS_ACCESS',
       /*
        * Unlike the Desenvolvedor's DEMAND_VIEW_ALL below, this one is paired with
        * PROJECT_ACCESS_ALL: an Agilista oversees delivery across every team's board, not
@@ -126,6 +140,12 @@ export const SYSTEM_ROLES = [
       'DEMAND_ACCESS',
       'DEMAND_KANBAN',
       'DEMAND_LIST',
+      // Every profile gets the Dashboard with its own indicators; the team's consolidated
+      // view (DASHBOARD_VIEW_ALL) is granted only where following delivery is the job.
+      'DASHBOARD_ACCESS',
+      'DASHBOARD_VIEW_OWN',
+      'INTEGRATION_ACCESS',
+      'DOCS_ACCESS',
       /*
        * Granted to all three seeded profiles on purpose.
        *

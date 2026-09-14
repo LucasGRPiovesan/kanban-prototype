@@ -25,9 +25,10 @@ export interface DemandListFilter {
   priority?: DemandPriorityValue;
   responsibleUuid?: Uuid;
   /**
-   * `undefined` (the default everywhere it isn't set explicitly) excludes archived
-   * demands — the board and history read as "active" unless the caller opts into seeing
-   * archived ones with `true`. `false` reads only non-archived, `true` only archived.
+   * `false` reads only non-archived demands, `true` only archived ones, and `undefined`
+   * reads **both** — which is what a cascade over "every demand of this person" needs
+   * (user exclusion), and never what a reading of the board wants. Every screen-facing
+   * query (board, history, dashboard, assistant) passes it explicitly.
    */
   archived?: boolean;
 }

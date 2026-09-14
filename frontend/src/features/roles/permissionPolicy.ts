@@ -159,11 +159,14 @@ function orderByCatalog(
 
 const MODULE_LABELS: Record<string, string> = {
   DEMAND: 'Demandas',
+  DASHBOARD: 'Dashboard',
   USER: 'Usuários',
   PROJECT: 'Projetos',
   ROLE: 'Perfis',
   LOG: 'Logs',
+  INTEGRATION: 'Integração',
   ASSISTANT: 'Assistente de IA',
+  DOCS: 'Documentação',
 };
 
 export function moduleLabel(module: string): string {

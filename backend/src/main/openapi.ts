@@ -835,9 +835,9 @@ export const openApiDocument = {
     '/dashboard': {
       get: {
         tags: ['Dashboard'],
-        summary: 'Situação e fluxo das demandas visíveis ao usuário (requer DEMAND_ACCESS)',
+        summary: 'Indicadores de situação e fluxo das demandas (requer DEMAND_ACCESS + DASHBOARD_ACCESS)',
         description: [
-          'Calculado sobre as mesmas demandas que GET /demands retornaria ao usuário — mesma visibilidade por projeto.',
+          'Escopo team (DASHBOARD_VIEW_ALL): as mesmas demandas não arquivadas que GET /demands retornaria ao usuário. Escopo personal (DASHBOARD_VIEW_OWN): apenas as demandas sob responsabilidade do usuário. Sem scope, usa o mais amplo permitido; escopo não permitido responde 403 DASHBOARD_SCOPE_DENIED, e nenhum escopo, 403 DASHBOARD_NO_SCOPE.',
           'Datas contadas no fuso APP_TIMEZONE. Tempos de entrega em dias, como mediana e percentil 85 (nearest-rank), nunca média.',
           '- summary: em aberto, atrasadas, vencendo hoje / em até 7 dias, paradas (iniciadas e sem mudar de status há 7+ dias).',
           '- flow: entregas e entradas no período vs. período anterior, lead time (criação → produção), cycle time (início → produção), entregas no prazo.',
@@ -846,6 +846,7 @@ export const openApiDocument = {
         parameters: [
           { name: 'projectUuid', in: 'query', schema: { type: 'string', format: 'uuid' } },
           { name: 'period', in: 'query', schema: { type: 'string', enum: ['30', '90'], default: '30' } },
+          { name: 'scope', in: 'query', schema: { type: 'string', enum: ['team', 'personal'] } },
         ],
         responses: { 200: { description: 'OK' }, ...commonResponses },
       },

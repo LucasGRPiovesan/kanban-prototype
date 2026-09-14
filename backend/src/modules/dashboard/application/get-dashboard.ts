@@ -13,6 +13,13 @@ import {
 export const DASHBOARD_PERIODS = [30, 90] as const;
 export type DashboardPeriod = (typeof DASHBOARD_PERIODS)[number];
 
+export const DASHBOARD_SCOPES = ['personal', 'team'] as const;
+/**
+ * `personal`: the demands the actor is responsible for. `team`: every demand the actor can
+ * read — the same set the board lists, bounded by allocation and DEMAND_VIEW_ALL.
+ */
+export type DashboardScope = (typeof DASHBOARD_SCOPES)[number];
+
 /**
  * Status transitions, read from the activity record — the only place that knows when a
  * demand moved, since the demand row only holds where it is now.
@@ -23,16 +30,29 @@ export interface DemandFlowQueries {
 
 export interface DashboardDTO extends DashboardMetrics {
   generatedAt: string;
-  scope: { projectUuid: string | null };
+  scope: {
+    projectUuid: string | null;
+    kind: DashboardScope;
+    /** Which scopes this actor may switch between — the screen's toggle reads this. */
+    available: DashboardScope[];
+  };
+}
+
+/** The scopes an actor's permissions allow, most comprehensive first. */
+export function availableScopes(actor: Actor): DashboardScope[] {
+  const scopes: DashboardScope[] = [];
+  if (actor.can('DASHBOARD_VIEW_ALL')) scopes.push('team');
+  if (actor.can('DASHBOARD_VIEW_OWN')) scopes.push('personal');
+  return scopes;
 }
 
 /**
  * The Dashboard: a reading of the demands the actor can already see, never more.
  *
- * Governed by DEMAND_ACCESS rather than by a permission of its own because it exposes
- * no information the demand list does not: the same demands, scoped by the same
- * project visibility, only counted instead of listed. The transition history it reads is
- * the same one the demand's own "Atualizações" tab shows under the same permission.
+ * Two independent questions decide what it counts. *Which demands the actor may read*
+ * comes from the demands module (DEMAND_ACCESS, allocation, DEMAND_VIEW_ALL) and is never
+ * widened here. *Whose indicators to consolidate* comes from the dashboard's own scope
+ * permissions: DASHBOARD_VIEW_OWN reads the actor's own work, DASHBOARD_VIEW_ALL the team's.
  */
 export class GetDashboard {
   constructor(
@@ -44,11 +64,50 @@ export class GetDashboard {
     private readonly clock: () => Date = () => new Date(),
   ) {}
 
+  /** The Dashboard screen: requires the module and at least one scope permission. */
   async execute(
+    actor: Actor,
+    query: { projectUuid?: string; periodDays: DashboardPeriod; scope?: DashboardScope },
+  ): Promise<DashboardDTO> {
+    actor.requireAll(['DEMAND_ACCESS', 'DASHBOARD_ACCESS']);
+    const available = availableScopes(actor);
+    if (available.length === 0) {
+      throw DomainError.forbidden(
+        'DASHBOARD_NO_SCOPE',
+        'Seu perfil acessa a Dashboard, mas não possui permissão para visualizar indicadores.',
+      );
+    }
+    const kind = query.scope ?? available[0]!;
+    if (!available.includes(kind)) {
+      throw DomainError.forbidden(
+        'DASHBOARD_SCOPE_DENIED',
+        kind === 'team'
+          ? 'Seu perfil não possui permissão para visualizar os indicadores consolidados da equipe.'
+          : 'Seu perfil não possui permissão para visualizar indicadores pessoais.',
+      );
+    }
+    return this.compute(actor, { ...query, scope: kind }, available);
+  }
+
+  /**
+   * The same reading for the assistant's reports, which are not the Dashboard screen: no
+   * DASHBOARD_ACCESS required, but the scope rule still applies — without
+   * DASHBOARD_VIEW_ALL the indicators it quotes are the person's own, never the team's.
+   */
+  async forAssistant(
     actor: Actor,
     query: { projectUuid?: string; periodDays: DashboardPeriod },
   ): Promise<DashboardDTO> {
     actor.require('DEMAND_ACCESS');
+    const kind: DashboardScope = actor.can('DASHBOARD_VIEW_ALL') ? 'team' : 'personal';
+    return this.compute(actor, { ...query, scope: kind }, [kind]);
+  }
+
+  private async compute(
+    actor: Actor,
+    query: { projectUuid?: string; periodDays: DashboardPeriod; scope: DashboardScope },
+    available: DashboardScope[],
+  ): Promise<DashboardDTO> {
     const policy = await this.projectAccess.forActor(actor);
     const visible = policy.visibleProjectUuids(actor);
 
@@ -61,14 +120,19 @@ export class GetDashboard {
       policy.assertAccess(actor, projectUuid);
     }
 
+    const personal = query.scope === 'personal';
     const [cards, projects] = await Promise.all([
       this.demands.listCards({
         restrictToProjectUuids: visible,
-        // The dashboard summarizes exactly what the board would list, so it obeys the
-        // same DEMAND_VIEW_ALL rule — otherwise the totals would quietly describe work
-        // the person is not allowed to open.
-        restrictToOwnerUuid: actor.canViewAllDemands() ? undefined : actor.userUuid.toString(),
+        // Team scope summarizes exactly what the board would list, so it obeys the same
+        // DEMAND_VIEW_ALL rule. Personal scope is the actor's own responsibility, which
+        // they can always read.
+        restrictToOwnerUuid: personal || actor.canViewAllDemands() ? undefined : actor.userUuid.toString(),
+        responsibleUuid: personal ? actor.userUuid : undefined,
         projectUuid,
+        // Archived demands are off the board this dashboard describes: counting them made
+        // work nobody can see on the Kanban show up as open, overdue or needing attention.
+        archived: false,
       }),
       this.projects.list({
         activeOnly: false,
@@ -107,7 +171,11 @@ export class GetDashboard {
     return {
       ...metrics,
       generatedAt: now.toISOString(),
-      scope: { projectUuid: projectUuid ? projectUuid.toString() : null },
+      scope: {
+        projectUuid: projectUuid ? projectUuid.toString() : null,
+        kind: query.scope,
+        available,
+      },
     };
   }
 }

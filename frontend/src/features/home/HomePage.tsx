@@ -24,6 +24,7 @@ interface Shortcut {
   description: string;
   icon: LucideIcon;
   permissions: PermissionCode[];
+  anyOf?: PermissionCode[];
   /** Same meaning and same source of truth as the navigation flag. */
   badge?: 'Melhoria' | 'Sugestão';
 }
@@ -39,7 +40,8 @@ const SHORTCUTS: Shortcut[] = [
     label: 'Dashboard',
     description: 'Veja de relance o que está atrasado, parado e sendo entregue.',
     icon: LayoutDashboard,
-    permissions: ['DEMAND_ACCESS'],
+    permissions: ['DEMAND_ACCESS', 'DASHBOARD_ACCESS'],
+    anyOf: ['DASHBOARD_VIEW_OWN', 'DASHBOARD_VIEW_ALL'],
     badge: 'Melhoria',
   },
   {
@@ -92,7 +94,7 @@ const SHORTCUTS: Shortcut[] = [
     label: 'Integração',
     description: 'Crie e atualize demandas a partir de um sistema externo.',
     icon: Plug,
-    permissions: [],
+    permissions: ['INTEGRATION_ACCESS'],
     badge: 'Sugestão',
   },
   {
@@ -100,7 +102,7 @@ const SHORTCUTS: Shortcut[] = [
     label: 'Documentação',
     description: 'Toda a documentação do projeto, navegável.',
     icon: BookOpen,
-    permissions: [],
+    permissions: ['DOCS_ACCESS'],
   },
 ];
 
@@ -111,8 +113,10 @@ const TODAY_FORMAT = new Intl.DateTimeFormat('pt-BR', {
 });
 
 export function HomePage() {
-  const { session, canEvery } = useAuth();
-  const available = SHORTCUTS.filter((shortcut) => canEvery(shortcut.permissions));
+  const { session, canEvery, canSome } = useAuth();
+  const available = SHORTCUTS.filter(
+    (shortcut) => canEvery(shortcut.permissions) && (!shortcut.anyOf || canSome(shortcut.anyOf)),
+  );
   const firstName = session?.user.name.split(' ')[0] ?? '';
   const roleName = session?.role.name ?? '';
 
