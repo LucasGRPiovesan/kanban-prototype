@@ -101,8 +101,18 @@ export interface DemandPriorityCounts {
   URGENT: number;
 }
 
+/** How many demands a user is responsible for, broken down by status — concluídas included. */
+export interface DemandStatusCounts {
+  NOT_STARTED: number;
+  IN_PROGRESS: number;
+  PAUSED: number;
+  IN_REVIEW: number;
+  PRODUCTION: number;
+}
+
 export interface UserPageItem extends User {
   demandPriorityCounts: DemandPriorityCounts;
+  demandStatusCounts: DemandStatusCounts;
 }
 
 export interface UserPage {
@@ -316,8 +326,10 @@ export interface AssigneeOption {
 /** Plain text. Authorship is enforced by the server; `canEdit` only saves a round trip. */
 export interface DemandComment {
   uuid: string;
+  /** The top-level comment this one replies to. `null` for a top-level comment itself. */
+  parentUuid: string | null;
   body: string;
-  author: { uuid: string; name: string };
+  author: { uuid: string; name: string; avatarUrl: string | null };
   createdAt: string;
   editedAt: string | null;
   canEdit: boolean;

@@ -130,8 +130,10 @@ export interface AssigneeDirectory {
 export interface DemandCommentView {
   uuid: string;
   demandUuid: string;
+  /** The comment this one replies to, one level deep only. `null` for a top-level comment. */
+  parentUuid: string | null;
   body: string;
-  author: { uuid: string; name: string };
+  author: { uuid: string; name: string; avatarUrl: string | null };
   createdAt: Date;
   editedAt: Date | null;
 }

@@ -62,6 +62,15 @@ export interface DemandPriorityCounts {
   URGENT: number;
 }
 
+/** How many demands a user is responsible for, broken down by status — concluídas included. */
+export interface DemandStatusCounts {
+  NOT_STARTED: number;
+  IN_PROGRESS: number;
+  PAUSED: number;
+  IN_REVIEW: number;
+  PRODUCTION: number;
+}
+
 export interface UserPageRow extends UserWithRoleView {
   /**
    * Excludes archived demands: a workload count is about what is still live, not
@@ -69,6 +78,8 @@ export interface UserPageRow extends UserWithRoleView {
    * including produção — since the point is "how much", not "how far along".
    */
   demandPriorityCounts: DemandPriorityCounts;
+  /** Same population as `demandPriorityCounts`, grouped by status instead of priority. */
+  demandStatusCounts: DemandStatusCounts;
 }
 
 export interface UserPageView {

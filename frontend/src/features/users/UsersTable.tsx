@@ -3,8 +3,9 @@ import { ChevronRight } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { DEMAND_PRIORITIES_ORDERED, PRIORITY_PRESENTATION } from '@/features/demands/priority';
+import { DEMAND_STATUSES_ORDERED, STATUS_PRESENTATION } from '@/features/demands/status';
 import { cn } from '@/lib/cn';
-import { formatDateTime, formatRelative } from '@/lib/relativeTime';
+import { formatDateTime } from '@/lib/relativeTime';
 import type { UserPageItem } from '@/lib/api/types';
 
 /**
@@ -35,13 +36,13 @@ export function UsersTable({ users }: { users: UserPageItem[] }) {
               Perfil
             </th>
             <th scope="col" className="whitespace-nowrap px-4 py-2.5 font-semibold">
-              Demandas por prioridade
-            </th>
-            <th scope="col" className="whitespace-nowrap px-4 py-2.5 font-semibold">
               Situação
             </th>
             <th scope="col" className="whitespace-nowrap px-4 py-2.5 font-semibold">
-              Atualizado
+              Demandas por prioridade
+            </th>
+            <th scope="col" className="whitespace-nowrap px-4 py-2.5 font-semibold">
+              Demandas por status
             </th>
             <th scope="col" className="whitespace-nowrap px-4 py-2.5 font-semibold">
               Criado em
@@ -86,10 +87,6 @@ export function UsersTable({ users }: { users: UserPageItem[] }) {
                 </td>
 
                 <td className="whitespace-nowrap px-4 py-2.5 align-middle">
-                  <PriorityCounts counts={user.demandPriorityCounts} />
-                </td>
-
-                <td className="whitespace-nowrap px-4 py-2.5 align-middle">
                   <span
                     className={cn(
                       'inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-bold',
@@ -109,10 +106,12 @@ export function UsersTable({ users }: { users: UserPageItem[] }) {
                   </span>
                 </td>
 
-                <td className="whitespace-nowrap px-4 py-2.5 align-middle text-xs text-muted">
-                  <time dateTime={user.updatedAt} title={formatDateTime(user.updatedAt)}>
-                    {formatRelative(user.updatedAt)}
-                  </time>
+                <td className="whitespace-nowrap px-4 py-2.5 align-middle">
+                  <PriorityCounts counts={user.demandPriorityCounts} />
+                </td>
+
+                <td className="whitespace-nowrap px-4 py-2.5 align-middle">
+                  <StatusCounts counts={user.demandStatusCounts} />
                 </td>
 
                 <td className="whitespace-nowrap px-4 py-2.5 align-middle text-xs text-muted">
@@ -151,6 +150,38 @@ function PriorityCounts({ counts }: { counts: UserPageItem['demandPriorityCounts
         const count = counts[priority];
         return (
           <Tooltip key={priority} label={`${presentation.label}: ${count}`}>
+            <span
+              aria-label={`${presentation.label}: ${count}`}
+              className={cn(
+                'flex items-center gap-0.5 text-2xs font-bold tabular-nums',
+                count > 0 ? presentation.accentClass : 'text-subtle opacity-40',
+              )}
+            >
+              <Icon className="h-3 w-3 shrink-0" strokeWidth={2.75} aria-hidden="true" />
+              {count}
+            </span>
+          </Tooltip>
+        );
+      })}
+    </span>
+  );
+}
+
+/**
+ * How many demands this person is responsible for, one number per status — the same
+ * shape `PriorityCounts` uses, so the two columns read as one family. Unlike the
+ * priority breakdown, `PRODUCTION` counts here: this column answers "how far along",
+ * not "how much is still open", so concluídas belong in the total.
+ */
+function StatusCounts({ counts }: { counts: UserPageItem['demandStatusCounts'] }) {
+  return (
+    <span className="flex items-center gap-2.5">
+      {DEMAND_STATUSES_ORDERED.map((status) => {
+        const presentation = STATUS_PRESENTATION[status];
+        const Icon = presentation.icon;
+        const count = counts[status];
+        return (
+          <Tooltip key={status} label={`${presentation.label}: ${count}`}>
             <span
               aria-label={`${presentation.label}: ${count}`}
               className={cn(

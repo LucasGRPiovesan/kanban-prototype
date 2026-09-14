@@ -43,7 +43,7 @@ Decisões que moldam o deploy:
 | **Rewrite de mesma origem** (`/api/*` do frontend → API) | O navegador só conversa com o domínio do frontend: o cookie de sessão é *first-party*, `SameSite=Lax` funciona em todos os navegadores (inclusive Safari, que bloqueia cookies de terceiros) e não há CORS no caminho. O destino vem da variável `API_ORIGIN` — nenhuma URL fica fixa no repositório. |
 | **Vercel Blob para anexos, autenticado por OIDC** | O disco das funções é efêmero. O adapter `VercelBlobStorage` implementa a mesma porta `FileStoragePort` do disco local e nunca recebe credencial: o SDK usa o token OIDC que a Vercel entrega a cada requisição da função, junto de `BLOB_STORE_ID` — nenhum segredo de longa duração no projeto. O banco guarda chaves, não URLs, então trocar de driver nunca reescreve linhas. |
 | **Migrations e seed só no build de Production** | Aplicadas antes de o novo deploy receber tráfego — o código nunca roda contra um schema mais antigo. Deploys de Preview geram o Prisma Client e não tocam o banco. |
-| **Uma única migration de inicialização** | O histórico de desenvolvimento foi consolidado em `20260913000000_init` (verificado idêntico à cadeia anterior). |
+| **Uma única migration de inicialização, mais as que vierem depois** | O histórico de desenvolvimento foi consolidado em `20260913000000_init` (verificado idêntico à cadeia anterior); mudanças no schema entram como novas migrations a partir dela. |
 
 ---
 
@@ -364,7 +364,9 @@ Revisão pré-deploy — o que foi verificado e o que foi corrigido.
   comparada com o resultado da cadeia de desenvolvimento anterior num banco de teste:
   mesmas colunas, tipos, defaults, collations, 89 índices e 20 FKs.
 - Próximas mudanças: `npm run db:migrate` localmente (gera a nova migration), commit, e o
-  build da Vercel aplica com `migrate deploy`.
+  build da Vercel aplica com `migrate deploy`. Primeiro exemplo:
+  `20260915000000_add_comment_replies`, que acrescenta `parent_comment_id` a
+  `demand_comments` para as respostas indentadas.
 - **Banco local criado antes da consolidação** (volume Docker antigo): o schema já é
   idêntico, basta registrar a nova migration como aplicada:
 

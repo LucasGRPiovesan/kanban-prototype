@@ -140,6 +140,7 @@ export class ListUsers {
 
 export interface UserPageItemDTO extends UserDTO {
   demandPriorityCounts: UserPageRow['demandPriorityCounts'];
+  demandStatusCounts: UserPageRow['demandStatusCounts'];
 }
 
 export interface UserPageDTO {
@@ -187,7 +188,11 @@ export class ListUsersPage {
     );
 
     return {
-      items: page.items.map((row) => ({ ...toDTO(row), demandPriorityCounts: row.demandPriorityCounts })),
+      items: page.items.map((row) => ({
+        ...toDTO(row),
+        demandPriorityCounts: row.demandPriorityCounts,
+        demandStatusCounts: row.demandStatusCounts,
+      })),
       page: pageNumber,
       pageSize,
       total: page.total,

@@ -1,3 +1,4 @@
+import { CircleDot, Eye, PauseCircle, PlayCircle, CheckCircle2 } from 'lucide-react';
 import type { DemandStatus } from '@/lib/api/types';
 
 export interface StatusPresentation {
@@ -11,6 +12,8 @@ export interface StatusPresentation {
   borderClass: string;
   /** Same solid colour, scoped to the top edge — the Kanban column's accent stripe. */
   topBorderClass: string;
+  /** Small-scale representation — the "demandas por status" count next to a person's name. */
+  icon: typeof CircleDot;
 }
 
 /**
@@ -30,6 +33,7 @@ export const STATUS_PRESENTATION: Record<DemandStatus, StatusPresentation> = {
     accentClass: 'text-status-not-started',
     borderClass: 'border-status-not-started',
     topBorderClass: 'border-t-status-not-started',
+    icon: CircleDot,
   },
   IN_PROGRESS: {
     label: 'Em andamento',
@@ -40,6 +44,7 @@ export const STATUS_PRESENTATION: Record<DemandStatus, StatusPresentation> = {
     accentClass: 'text-status-in-progress',
     borderClass: 'border-status-in-progress',
     topBorderClass: 'border-t-status-in-progress',
+    icon: PlayCircle,
   },
   PAUSED: {
     label: 'Pausada',
@@ -49,6 +54,7 @@ export const STATUS_PRESENTATION: Record<DemandStatus, StatusPresentation> = {
     accentClass: 'text-status-paused',
     borderClass: 'border-status-paused',
     topBorderClass: 'border-t-status-paused',
+    icon: PauseCircle,
   },
   IN_REVIEW: {
     label: 'Em homologação',
@@ -58,6 +64,7 @@ export const STATUS_PRESENTATION: Record<DemandStatus, StatusPresentation> = {
     accentClass: 'text-status-in-review',
     borderClass: 'border-status-in-review',
     topBorderClass: 'border-t-status-in-review',
+    icon: Eye,
   },
   PRODUCTION: {
     label: 'Em produção',
@@ -68,6 +75,7 @@ export const STATUS_PRESENTATION: Record<DemandStatus, StatusPresentation> = {
     accentClass: 'text-status-production',
     borderClass: 'border-status-production',
     topBorderClass: 'border-t-status-production',
+    icon: CheckCircle2,
   },
 };
 
@@ -79,3 +87,6 @@ export const KANBAN_COLUMNS: DemandStatus[] = [
   'IN_REVIEW',
   'PRODUCTION',
 ];
+
+/** Reading order for the "demandas por status" count — same order as the Kanban columns. */
+export const DEMAND_STATUSES_ORDERED: DemandStatus[] = [...KANBAN_COLUMNS];

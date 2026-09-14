@@ -215,8 +215,8 @@ export const demandsApi = {
   history: (uuid: string, page?: number) =>
     api.get<LogPage>(`/demands/${uuid}/history${toQuery({ page })}`),
   comments: (uuid: string) => api.get<DemandComment[]>(`/demands/${uuid}/comments`),
-  addComment: (uuid: string, body: string) =>
-    api.post<DemandComment>(`/demands/${uuid}/comments`, { body }),
+  addComment: (uuid: string, body: string, parentCommentUuid?: string) =>
+    api.post<DemandComment>(`/demands/${uuid}/comments`, { body, parentCommentUuid }),
   editComment: (uuid: string, commentUuid: string, body: string) =>
     api.patch<DemandComment>(`/demands/${uuid}/comments/${commentUuid}`, { body }),
   removeComment: (uuid: string, commentUuid: string) =>

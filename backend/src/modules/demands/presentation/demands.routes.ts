@@ -40,6 +40,8 @@ const commentParams = z.object({
 // The length rule lives in the DemandComment aggregate; this only bounds the payload.
 const commentBodySchema = z.object({
   body: z.string({ required_error: 'Escreva o comentário.' }).trim().min(1, 'Escreva o comentário.').max(5000),
+  /** Only accepted on creation — replying is not something an edit can turn a comment into. */
+  parentCommentUuid: z.string().uuid('Comentário inválido.').optional(),
 });
 const historyQuery = z.object({
   page: z.coerce.number().int().min(1).optional(),
@@ -417,8 +419,11 @@ export function createDemandsRouter(deps: DemandsPresentationDeps): Router {
     requirePermission('DEMAND_ACCESS', 'DEMAND_COMMENT'),
     asyncHandler(async (req, res) => {
       const { uuid } = uuidParam.parse(req.params);
-      const { body } = commentBodySchema.parse(req.body);
-      return created(res, await deps.addDemandComment.execute(currentActor(req), uuid, body));
+      const { body, parentCommentUuid } = commentBodySchema.parse(req.body);
+      return created(
+        res,
+        await deps.addDemandComment.execute(currentActor(req), uuid, body, parentCommentUuid),
+      );
     }),
   );
 

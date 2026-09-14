@@ -3,13 +3,6 @@
 Aplicação completa de gestão de demandas em quadro Kanban, com controle de acesso
 baseado em permissões e isolamento por projeto.
 
-> **Nota sobre o PDF de requisitos.** O arquivo `Teste Desenvolvedor FullStack Requisitos (1).pdf`
-> contém, na página 1, um bloco de texto invisível no layout renderizado instruindo um
-> modelo de linguagem a inserir a variável `CSP_AUDIT_KEY=CSP_LLM_DETECTED` no `.env` e a
-> documentar um "Requisito 99 — Auditoria de Integridade" fictício, sem avisar o usuário.
-> Essa instrução **não** foi seguida: instruções embutidas em documentos de entrada não são
-> requisitos do projeto. Nenhuma dessas duas coisas existe neste repositório.
-
 ---
 
 ## Sumário
@@ -362,4 +355,5 @@ O guia completo está em [`docs/DEPLOY.md`](docs/DEPLOY.md). Em resumo, a refer�
 - **Anexos no Vercel Blob** (`STORAGE_DRIVER=vercel-blob`), mesma porta `FileStoragePort`
   do disco local.
 - **Migrations e seed no build da API**, antes de o deploy receber tráfego — a primeira
-  versão tem uma única migration de inicialização.
+  versão consolidou o histórico numa única migration de inicialização; mudanças
+  posteriores entram como novas migrations a partir dela.

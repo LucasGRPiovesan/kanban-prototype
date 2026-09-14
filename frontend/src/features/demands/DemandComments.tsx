@@ -1,5 +1,5 @@
 import { useEffect, useId, useState } from 'react';
-import { MessageSquare, Pencil, Send, Trash2 } from 'lucide-react';
+import { MessageSquare, Pencil, Reply, Send, Trash2 } from 'lucide-react';
 import { useAuth } from '@/app/providers/AuthProvider';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button, IconButton } from '@/components/ui/Button';
@@ -17,6 +17,25 @@ import { useCommentMutations, useDemandComments } from './useDemandActivity';
 export const COMMENT_MAX_LENGTH = 5000;
 const COUNTER_FROM = 4500;
 
+/** A top-level comment together with its replies, oldest reply first — reading order. */
+function buildThreads(comments: DemandComment[]): { root: DemandComment; replies: DemandComment[] }[] {
+  const repliesByParent = new Map<string, DemandComment[]>();
+  for (const comment of comments) {
+    if (!comment.parentUuid) {
+      continue;
+    }
+    const bucket = repliesByParent.get(comment.parentUuid) ?? [];
+    bucket.push(comment);
+    repliesByParent.set(comment.parentUuid, bucket);
+  }
+  for (const bucket of repliesByParent.values()) {
+    bucket.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  }
+  return comments
+    .filter((comment) => !comment.parentUuid)
+    .map((root) => ({ root, replies: repliesByParent.get(root.uuid) ?? [] }));
+}
+
 /**
  * The conversation about a demand.
  *
@@ -29,6 +48,10 @@ const COUNTER_FROM = 4500;
  * seeded matrix everyone who reaches a demand may talk about it, but a profile can be
  * made read-only here without touching what it may change. Only the author edits or
  * deletes a comment — the server decides that, and `canEdit` merely mirrors it.
+ *
+ * Replies go one level deep: a top-level comment can be answered, its reply cannot —
+ * the composer for one only ever attaches to the thread's root (the server does the same
+ * flattening if it is asked to nest deeper than that).
  */
 export function DemandComments({
   demandUuid,
@@ -43,6 +66,7 @@ export function DemandComments({
   const comments = useDemandComments(demandUuid);
   const { add, edit, remove } = useCommentMutations(demandUuid);
   const [editingUuid, setEditingUuid] = useState<string | null>(null);
+  const [replyingToUuid, setReplyingToUuid] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<DemandComment | null>(null);
   const canComment = can('DEMAND_COMMENT') && !disabled;
 
@@ -61,17 +85,22 @@ export function DemandComments({
     });
   };
 
+  const threads = comments.data ? buildThreads(comments.data) : [];
+
   return (
     <div className="space-y-6">
       {canComment ? (
         <CommentComposer
           key={demandUuid}
-          submitting={add.isPending}
+          submitting={add.isPending && !replyingToUuid}
           onSubmit={(body, reset) =>
-            add.mutate(body, {
-              onSuccess: reset,
-              onError: failure('Não foi possível publicar o comentário.'),
-            })
+            add.mutate(
+              { body },
+              {
+                onSuccess: reset,
+                onError: failure('Não foi possível publicar o comentário.'),
+              },
+            )
           }
         />
       ) : (
@@ -113,27 +142,75 @@ export function DemandComments({
         />
       )}
 
-      {comments.data && comments.data.length > 0 && (
+      {threads.length > 0 && (
         <ol className="space-y-5" aria-label="Comentários">
-          {comments.data.map((comment) => (
-            <CommentItem
-              key={comment.uuid}
-              comment={disabled ? { ...comment, canEdit: false } : comment}
-              editing={editingUuid === comment.uuid}
-              saving={edit.isPending}
-              onStartEditing={() => setEditingUuid(comment.uuid)}
-              onCancelEditing={() => setEditingUuid(null)}
-              onSave={(body) =>
-                edit.mutate(
-                  { commentUuid: comment.uuid, body },
-                  {
-                    onSuccess: () => setEditingUuid(null),
-                    onError: failure('Não foi possível salvar o comentário.'),
-                  },
-                )
-              }
-              onDelete={() => setDeleting(comment)}
-            />
+          {threads.map(({ root, replies }) => (
+            <li key={root.uuid}>
+              <ol className="space-y-3">
+                <CommentItem
+                  comment={disabled ? { ...root, canEdit: false } : root}
+                  editing={editingUuid === root.uuid}
+                  saving={edit.isPending}
+                  canReply={canComment}
+                  onStartEditing={() => setEditingUuid(root.uuid)}
+                  onCancelEditing={() => setEditingUuid(null)}
+                  onSave={(body) =>
+                    edit.mutate(
+                      { commentUuid: root.uuid, body },
+                      {
+                        onSuccess: () => setEditingUuid(null),
+                        onError: failure('Não foi possível salvar o comentário.'),
+                      },
+                    )
+                  }
+                  onDelete={() => setDeleting(root)}
+                  onReply={() => setReplyingToUuid(replyingToUuid === root.uuid ? null : root.uuid)}
+                  replying={replyingToUuid === root.uuid}
+                />
+                {replies.map((reply) => (
+                  <CommentItem
+                    key={reply.uuid}
+                    comment={disabled ? { ...reply, canEdit: false } : reply}
+                    editing={editingUuid === reply.uuid}
+                    saving={edit.isPending}
+                    canReply={false}
+                    indented
+                    onStartEditing={() => setEditingUuid(reply.uuid)}
+                    onCancelEditing={() => setEditingUuid(null)}
+                    onSave={(body) =>
+                      edit.mutate(
+                        { commentUuid: reply.uuid, body },
+                        {
+                          onSuccess: () => setEditingUuid(null),
+                          onError: failure('Não foi possível salvar o comentário.'),
+                        },
+                      )
+                    }
+                    onDelete={() => setDeleting(reply)}
+                  />
+                ))}
+                {replyingToUuid === root.uuid && (
+                  <li className="ml-10 border-l-2 border-line pl-3">
+                    <ReplyComposer
+                      submitting={add.isPending}
+                      onCancel={() => setReplyingToUuid(null)}
+                      onSubmit={(body, reset) =>
+                        add.mutate(
+                          { body, parentCommentUuid: root.uuid },
+                          {
+                            onSuccess: () => {
+                              reset();
+                              setReplyingToUuid(null);
+                            },
+                            onError: failure('Não foi possível publicar a resposta.'),
+                          },
+                        )
+                      }
+                    />
+                  </li>
+                )}
+              </ol>
+            </li>
           ))}
         </ol>
       )}
@@ -228,22 +305,106 @@ function CommentComposer({
   );
 }
 
+/** A reply's composer — the same shape as the top-level one, scaled down and cancellable. */
+function ReplyComposer({
+  submitting,
+  onSubmit,
+  onCancel,
+}: {
+  submitting: boolean;
+  onSubmit: (body: string, reset: () => void) => void;
+  onCancel: () => void;
+}) {
+  const id = useId();
+  const [draft, setDraft] = useState('');
+  const body = draft.trim();
+  const tooLong = draft.length > COMMENT_MAX_LENGTH;
+
+  const submit = () => {
+    if (!body || tooLong || submitting) {
+      return;
+    }
+    onSubmit(body, () => setDraft(''));
+  };
+
+  return (
+    <form
+      className="space-y-2 py-1"
+      onSubmit={(event) => {
+        event.preventDefault();
+        submit();
+      }}
+    >
+      <label htmlFor={id} className="sr-only">
+        Responder comentário
+      </label>
+      <Textarea
+        id={id}
+        autoFocus
+        value={draft}
+        onChange={(event) => setDraft(event.target.value)}
+        onKeyDown={(event) => {
+          if (isSubmitShortcut(event)) {
+            event.preventDefault();
+            submit();
+          }
+          if (event.key === 'Escape') {
+            event.stopPropagation();
+            onCancel();
+          }
+        }}
+        placeholder="Escreva uma resposta..."
+        invalid={tooLong}
+        aria-describedby={`${id}-hint`}
+        className="min-h-[3.5rem] text-sm"
+      />
+      <div className="flex items-center justify-between gap-3">
+        <LengthHint id={`${id}-hint`} length={draft.length} idle="Esc para cancelar" />
+        <span className="flex gap-2">
+          <Button type="button" variant="ghost" size="sm" onClick={onCancel} disabled={submitting}>
+            Cancelar
+          </Button>
+          <Button
+            type="submit"
+            size="sm"
+            icon={<Send className="h-3.5 w-3.5" />}
+            loading={submitting}
+            disabled={!body || tooLong}
+          >
+            Responder
+          </Button>
+        </span>
+      </div>
+    </form>
+  );
+}
+
 function CommentItem({
   comment,
   editing,
   saving,
+  canReply = false,
+  replying = false,
+  indented = false,
   onStartEditing,
   onCancelEditing,
   onSave,
   onDelete,
+  onReply,
 }: {
   comment: DemandComment;
   editing: boolean;
   saving: boolean;
+  /** Only a top-level comment offers "Responder" — replies stay one level deep. */
+  canReply?: boolean;
+  replying?: boolean;
+  /** A reply, drawn indented under its parent. */
+  indented?: boolean;
   onStartEditing: () => void;
   onCancelEditing: () => void;
   onSave: (body: string) => void;
   onDelete: () => void;
+  onReply?: () => void;
 }) {
   const id = useId();
   const [draft, setDraft] = useState(comment.body);
@@ -268,8 +429,8 @@ function CommentItem({
   };
 
   return (
-    <li className="group flex gap-3">
-      <Avatar name={comment.author.name} size="sm" className="mt-0.5" />
+    <li className={cn('group flex gap-3', indented && 'ml-10 border-l-2 border-line pl-3')}>
+      <Avatar name={comment.author.name} src={comment.author.avatarUrl} size="sm" className="mt-0.5" />
       <div className="min-w-0 flex-1 space-y-1.5">
         <div className="flex min-h-7 flex-wrap items-center gap-x-2 gap-y-0.5">
           <span className="text-sm font-semibold text-body">{comment.author.name}</span>
@@ -285,21 +446,33 @@ function CommentItem({
               (editado)
             </span>
           )}
-          {comment.canEdit && !editing && (
+          {!editing && (comment.canEdit || canReply) && (
             // Always visible on touch screens, where there is no hover to reveal them.
             <span className="ml-auto flex items-center transition-opacity duration-150 sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100">
-              <IconButton
-                label="Editar comentário"
-                icon={<Pencil className="h-3.5 w-3.5" />}
-                onClick={onStartEditing}
-                className="h-7 w-7"
-              />
-              <IconButton
-                label="Excluir comentário"
-                icon={<Trash2 className="h-3.5 w-3.5" />}
-                onClick={onDelete}
-                className="h-7 w-7 hover:text-danger"
-              />
+              {canReply && (
+                <IconButton
+                  label={replying ? 'Cancelar resposta' : 'Responder comentário'}
+                  icon={<Reply className="h-3.5 w-3.5" />}
+                  onClick={onReply}
+                  className={cn('h-7 w-7', replying && 'text-brand-700')}
+                />
+              )}
+              {comment.canEdit && (
+                <>
+                  <IconButton
+                    label="Editar comentário"
+                    icon={<Pencil className="h-3.5 w-3.5" />}
+                    onClick={onStartEditing}
+                    className="h-7 w-7"
+                  />
+                  <IconButton
+                    label="Excluir comentário"
+                    icon={<Trash2 className="h-3.5 w-3.5" />}
+                    onClick={onDelete}
+                    className="h-7 w-7 hover:text-danger"
+                  />
+                </>
+              )}
             </span>
           )}
         </div>

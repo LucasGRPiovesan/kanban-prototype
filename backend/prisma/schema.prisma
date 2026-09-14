@@ -229,21 +229,27 @@ model DemandAttachment {
 /// people concurrently, and never needs the demand's invariants to be checked — loading
 /// the demand and every comment to append one line would be the wrong trade-off.
 model DemandComment {
-  id           BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
-  uuid         String    @unique(map: "uq_demand_comments_uuid") @db.Char(36)
-  demandId     BigInt    @map("demand_id") @db.UnsignedBigInt
-  authorUserId BigInt    @map("author_user_id") @db.UnsignedBigInt
+  id              BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  uuid            String    @unique(map: "uq_demand_comments_uuid") @db.Char(36)
+  demandId        BigInt    @map("demand_id") @db.UnsignedBigInt
+  authorUserId    BigInt    @map("author_user_id") @db.UnsignedBigInt
+  /// A reply's parent, one level deep only — the UI indents a reply under its parent,
+  /// never a reply under a reply, so a reply to a reply is reattached to that same root.
+  parentCommentId BigInt?   @map("parent_comment_id") @db.UnsignedBigInt
   /// Plain text. Rich text would open a second XSS surface for no requirement.
-  body         String    @db.Text
-  createdAt    DateTime  @default(now()) @map("created_at") @db.DateTime(3)
-  editedAt     DateTime? @map("edited_at") @db.DateTime(3)
+  body            String    @db.Text
+  createdAt       DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  editedAt        DateTime? @map("edited_at") @db.DateTime(3)
 
-  demand Demand @relation(fields: [demandId], references: [id], onDelete: Cascade)
-  author User   @relation("CommentAuthor", fields: [authorUserId], references: [id])
+  demand        Demand          @relation(fields: [demandId], references: [id], onDelete: Cascade)
+  author        User            @relation("CommentAuthor", fields: [authorUserId], references: [id])
+  parentComment DemandComment?  @relation("CommentReplies", fields: [parentCommentId], references: [id], onDelete: Cascade)
+  replies       DemandComment[] @relation("CommentReplies")
 
   // The thread of one demand, in order.
   @@index([demandId, createdAt], map: "ix_demand_comments_demand_created")
   @@index([authorUserId], map: "ix_demand_comments_author")
+  @@index([parentCommentId], map: "ix_demand_comments_parent")
   @@map("demand_comments")
 }
 

@@ -4,6 +4,7 @@ import { DomainError } from '../../../shared/domain/errors';
 import { type Uuid } from '../../../shared/domain/identifier';
 import {
   type DemandPriorityCounts,
+  type DemandStatusCounts,
   type EffectivePermissionsResolver,
   type UserListFilter,
   type UserPageView,
@@ -17,6 +18,13 @@ import { type User } from '../domain/user';
 import { UserMapper } from './mappers';
 
 const EMPTY_PRIORITY_COUNTS: DemandPriorityCounts = { LOW: 0, MEDIUM: 0, HIGH: 0, URGENT: 0 };
+const EMPTY_STATUS_COUNTS: DemandStatusCounts = {
+  NOT_STARTED: 0,
+  IN_PROGRESS: 0,
+  PAUSED: 0,
+  IN_REVIEW: 0,
+  PRODUCTION: 0,
+};
 
 function whereFromFilter(filter: UserListFilter = {}): Prisma.UserWhereInput {
   const where: Prisma.UserWhereInput = {};
@@ -134,11 +142,15 @@ export class PrismaUserRepository implements UserRepository, UserQueries {
       }),
       this.prisma.user.count({ where }),
     ]);
-    const counts = await this.priorityCountsByUser(rows.map((row) => row.id));
+    const [priorityCounts, statusCounts] = await Promise.all([
+      this.priorityCountsByUser(rows.map((row) => row.id)),
+      this.statusCountsByUser(rows.map((row) => row.id)),
+    ]);
     return {
       items: rows.map((row) => ({
         ...toView(row),
-        demandPriorityCounts: counts.get(row.id.toString()) ?? EMPTY_PRIORITY_COUNTS,
+        demandPriorityCounts: priorityCounts.get(row.id.toString()) ?? EMPTY_PRIORITY_COUNTS,
+        demandStatusCounts: statusCounts.get(row.id.toString()) ?? EMPTY_STATUS_COUNTS,
       })),
       total,
     };
@@ -165,6 +177,29 @@ export class PrismaUserRepository implements UserRepository, UserQueries {
       const key = group.responsibleUserId.toString();
       const counts = byUser.get(key) ?? { ...EMPTY_PRIORITY_COUNTS };
       counts[group.priority] = group._count._all;
+      byUser.set(key, counts);
+    }
+    return byUser;
+  }
+
+  /**
+   * Same one-`groupBy`-per-page shape as `priorityCountsByUser`, but by status and
+   * including `PRODUCTION` — here the point is "how far along", so concluídas count too.
+   */
+  private async statusCountsByUser(userIds: bigint[]): Promise<Map<string, DemandStatusCounts>> {
+    if (userIds.length === 0) {
+      return new Map();
+    }
+    const groups = await this.prisma.demand.groupBy({
+      by: ['responsibleUserId', 'status'],
+      where: { responsibleUserId: { in: userIds }, archived: false },
+      _count: { _all: true },
+    });
+    const byUser = new Map<string, DemandStatusCounts>();
+    for (const group of groups) {
+      const key = group.responsibleUserId.toString();
+      const counts = byUser.get(key) ?? { ...EMPTY_STATUS_COUNTS };
+      counts[group.status] = group._count._all;
       byUser.set(key, counts);
     }
     return byUser;

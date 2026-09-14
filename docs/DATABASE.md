@@ -7,7 +7,8 @@ Para a primeira versão publicada, o histórico de desenvolvimento foi consolida
 única migration de inicialização (`20260913000000_init`), gerada a partir do
 `schema.prisma` e verificada como idêntica ao resultado da cadeia anterior — mesmas
 colunas, tipos, defaults, collations, 89 índices e 20 chaves estrangeiras. Mudanças
-futuras entram como novas migrations a partir dela (`npm run db:migrate`).
+futuras entram como novas migrations a partir dela (`npm run db:migrate`) — a primeira,
+`20260915000000_add_comment_replies`, acrescenta `parent_comment_id` a `demand_comments`.
 
 ## Sumário
 
@@ -42,6 +43,7 @@ erDiagram
 
     DEMANDS ||--o{ DEMAND_COMMENTS : recebe
     USERS ||--o{ DEMAND_COMMENTS : escreveu
+    DEMAND_COMMENTS ||--o{ DEMAND_COMMENTS : responde
 
     PROJECTS ||--o| PROJECT_INTEGRATION_CREDENTIALS : possui
     USERS ||--o{ PROJECT_INTEGRATION_CREDENTIALS : gerou
@@ -133,6 +135,7 @@ erDiagram
         char36 uuid UK
         bigint demand_id FK
         bigint author_user_id FK
+        bigint parent_comment_id FK
         text body
         datetime created_at
         datetime edited_at
@@ -267,6 +270,11 @@ Conversa sobre uma demanda — agregado próprio, não parte de `Demand`. `body`
 puro, 1 a 5000 caracteres; `edited_at` é `NULL` até a primeira edição. Só o autor
 (`author_user_id`) pode editar ou excluir a própria linha — regra aplicada no domínio
 (`DemandComment.assertCanDelete`), não pela tabela.
+
+`parent_comment_id` é a auto-referência que sustenta as respostas indentadas: `NULL`
+num comentário raiz, ou o `id` de outro comentário da mesma demanda. A indentação vai só
+um nível — responder a uma resposta reata o comentário na raiz da conversa, então a
+coluna nunca aponta para uma linha que já tem o próprio `parent_comment_id` preenchido.
 
 ### `project_integration_credentials`
 Uma linha por projeto (`project_id` é `UNIQUE`) — a credencial de API que autoriza um
@@ -468,10 +476,13 @@ INDEX  ix_demand_attachments_demand_created (demand_id, created_at)
 UNIQUE uq_demand_comments_uuid (uuid)
 INDEX  ix_demand_comments_demand_created (demand_id, created_at)
 INDEX  ix_demand_comments_author (author_user_id)
+INDEX  ix_demand_comments_parent (parent_comment_id)
 ```
 
 `(demand_id, created_at)` entrega a conversa de uma demanda em ordem — a aba
-Comentários lista do mais recente ao mais antigo sobre este índice.
+Comentários lista do mais recente ao mais antigo sobre este índice, e a API agrupa
+respostas sob a própria raiz em memória (`ix_demand_comments_parent` é o que torna
+essa busca por `parent_comment_id` indexada, não uma varredura).
 
 ### `project_integration_credentials`
 
@@ -530,6 +541,7 @@ buscá-las.
 | `demands → users` (responsável/criador) | `RESTRICT` | Preserva a autoria e a responsabilidade |
 | `demand_comments → demands` | `CASCADE` | Comentário não sobrevive à demanda |
 | `demand_comments → users` | `RESTRICT` | Preserva a autoria do comentário |
+| `demand_comments → demand_comments` (resposta) | `CASCADE` | A resposta não sobrevive ao comentário raiz |
 | `project_integration_credentials → projects` | `CASCADE` | Credencial não sobrevive ao projeto |
 | `project_integration_credentials → users` | `RESTRICT` | Preserva quem gerou a credencial |
 | `logs → (qualquer tabela)` | *(nenhuma FK)* | Ver [Por que `logs` não tem FK](#por-que-logs-não-tem-fk) |

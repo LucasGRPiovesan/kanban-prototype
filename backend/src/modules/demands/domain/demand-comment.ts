@@ -8,6 +8,8 @@ export interface DemandCommentProps {
   uuid: Uuid;
   demandUuid: Uuid;
   authorUuid: Uuid;
+  /** The comment this one replies to, one level deep only. `null` for a top-level comment. */
+  parentCommentUuid: Uuid | null;
   body: string;
   createdAt: Date;
   editedAt: Date | null;
@@ -31,11 +33,17 @@ export interface DemandCommentProps {
 export class DemandComment {
   private constructor(private props: DemandCommentProps) {}
 
-  static create(input: { demandUuid: Uuid; authorUuid: Uuid; body: string }): DemandComment {
+  static create(input: {
+    demandUuid: Uuid;
+    authorUuid: Uuid;
+    body: string;
+    parentCommentUuid?: Uuid | null;
+  }): DemandComment {
     return new DemandComment({
       uuid: Uuid.generate(),
       demandUuid: input.demandUuid,
       authorUuid: input.authorUuid,
+      parentCommentUuid: input.parentCommentUuid ?? null,
       body: DemandComment.assertBody(input.body),
       createdAt: new Date(),
       editedAt: null,
@@ -54,6 +62,9 @@ export class DemandComment {
   }
   get authorUuid(): Uuid {
     return this.props.authorUuid;
+  }
+  get parentCommentUuid(): Uuid | null {
+    return this.props.parentCommentUuid;
   }
   get body(): string {
     return this.props.body;

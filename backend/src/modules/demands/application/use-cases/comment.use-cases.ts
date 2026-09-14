@@ -16,8 +16,10 @@ import { type DemandAccessGuard } from './demand.use-cases';
 
 export interface DemandCommentDTO {
   uuid: string;
+  /** The top-level comment this one replies to. `null` for a top-level comment itself. */
+  parentUuid: string | null;
   body: string;
-  author: { uuid: string; name: string };
+  author: { uuid: string; name: string; avatarUrl: string | null };
   createdAt: string;
   editedAt: string | null;
   /** Convenience for the UI. The domain enforces authorship on every write regardless. */
@@ -41,6 +43,7 @@ function assertNotArchived(demand: { archived: boolean }): void {
 function toDTO(actor: Actor, view: DemandCommentView): DemandCommentDTO {
   return {
     uuid: view.uuid,
+    parentUuid: view.parentUuid,
     body: view.body,
     author: view.author,
     createdAt: view.createdAt.toISOString(),
@@ -71,14 +74,21 @@ export class AddDemandComment {
     private readonly activity: DemandActivityLog,
   ) {}
 
-  async execute(actor: Actor, demandUuid: string, body: string): Promise<DemandCommentDTO> {
+  async execute(
+    actor: Actor,
+    demandUuid: string,
+    body: string,
+    parentCommentUuid?: string,
+  ): Promise<DemandCommentDTO> {
     actor.require('DEMAND_COMMENT');
     const demand = await this.guard.loadAccessible(actor, demandUuid);
     assertNotArchived(demand);
+    const parentUuid = await this.resolveParent(demand.uuid, parentCommentUuid);
     const comment = DemandComment.create({
       demandUuid: demand.uuid,
       authorUuid: actor.userUuid,
       body,
+      parentCommentUuid: parentUuid,
     });
 
     const view = await this.uow.run(async () => {
@@ -93,6 +103,18 @@ export class AddDemandComment {
       throw DomainError.invariant('COMMENT_NOT_PERSISTED', 'Falha ao carregar o comentário criado.');
     }
     return toDTO(actor, view);
+  }
+
+  /**
+   * One level of indentation only: a reply to a reply is reattached to that reply's own
+   * parent, so the thread never grows a second level the UI has no room to show.
+   */
+  private async resolveParent(demandUuid: Uuid, parentCommentUuid?: string): Promise<Uuid | null> {
+    if (!parentCommentUuid) {
+      return null;
+    }
+    const parent = await loadCommentOf(this.comments, demandUuid, parentCommentUuid);
+    return parent.parentCommentUuid ?? parent.uuid;
   }
 }
 

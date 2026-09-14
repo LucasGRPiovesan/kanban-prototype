@@ -134,8 +134,21 @@ const commentSchema = {
   type: 'object',
   properties: {
     uuid: { type: 'string', format: 'uuid' },
+    parentUuid: {
+      type: 'string',
+      format: 'uuid',
+      nullable: true,
+      description: 'Comentário de nível superior ao qual este responde. `null` num comentário raiz.',
+    },
     body: { type: 'string', description: 'Texto puro, 1 a 5000 caracteres.' },
-    author: namedRef,
+    author: {
+      type: 'object',
+      properties: {
+        uuid: { type: 'string', format: 'uuid' },
+        name: { type: 'string' },
+        avatarUrl: { type: 'string', nullable: true },
+      },
+    },
     createdAt: { type: 'string', format: 'date-time' },
     editedAt: { type: 'string', format: 'date-time', nullable: true },
     canEdit: { type: 'boolean', description: 'Verdadeiro apenas para o autor.' },
@@ -149,7 +162,15 @@ const commentBody = {
       schema: {
         type: 'object',
         required: ['body'],
-        properties: { body: { type: 'string', minLength: 1, maxLength: 5000 } },
+        properties: {
+          body: { type: 'string', minLength: 1, maxLength: 5000 },
+          parentCommentUuid: {
+            type: 'string',
+            format: 'uuid',
+            description:
+              'Só na criação. Responder a uma resposta reata na raiz — a indentação vai só um nível.',
+          },
+        },
       },
     },
   },

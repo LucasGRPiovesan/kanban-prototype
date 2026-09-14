@@ -35,7 +35,8 @@ export function useCommentMutations(demandUuid: string) {
   const invalidate = () => queryClient.invalidateQueries({ queryKey: key });
 
   const add = useMutation({
-    mutationFn: (body: string) => demandsApi.addComment(demandUuid, body),
+    mutationFn: ({ body, parentCommentUuid }: { body: string; parentCommentUuid?: string }) =>
+      demandsApi.addComment(demandUuid, body, parentCommentUuid),
     onSuccess: invalidate,
   });
 
