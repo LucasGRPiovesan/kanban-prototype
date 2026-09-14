@@ -610,7 +610,8 @@ export const openApiDocument = {
         summary: 'Edita demanda (requer DEMAND_UPDATE)',
         description:
           '`projectUuid: null` desatrela a demanda do projeto; omitir o campo mantém o que está. Atrelar a um projeto do qual o responsável atual não participa é recusado com 422 RESPONSIBLE_NOT_PROJECT_MEMBER — envie o novo responsável junto na mesma requisição. ' +
-          'Título, descrição e status exigem apenas DEMAND_UPDATE; `priority`, `dueDate`, `responsibleUuid` e `projectUuid` exigem também a permissão específica do campo (DEMAND_UPDATE_PRIORITY, DEMAND_UPDATE_DUE_DATE, DEMAND_UPDATE_RESPONSIBLE, DEMAND_UPDATE_PROJECT) — sem ela, 403 PERMISSION_DENIED.',
+          'Título, descrição e status exigem apenas DEMAND_UPDATE; `priority`, `dueDate`, `responsibleUuid` e `projectUuid` exigem também a permissão específica do campo (DEMAND_UPDATE_PRIORITY, DEMAND_UPDATE_DUE_DATE, DEMAND_UPDATE_RESPONSIBLE, DEMAND_UPDATE_PROJECT) — sem ela, 403 PERMISSION_DENIED. ' +
+          'DEMAND_UPDATE sozinho só alcança demandas das quais o ator é responsável ou autor; gerenciar uma demanda de outra pessoa exige também DEMAND_MANAGE_ALL — sem ela, 403 DEMAND_NOT_OWN. `status`, quando enviado, aplica a mesma máquina de estados de PATCH /demands/{uuid}/status (produção é terminal sem DEMAND_MANAGE_PRODUCTION) no mesmo request, registrando um único evento de auditoria e uma única notificação junto com os demais campos.',
         responses: { 200: { description: 'OK' }, ...commonResponses },
       },
       delete: { tags: ['Demands'], parameters: [uuidPath], summary: 'Exclui demanda (requer DEMAND_DELETE)', responses: { 204: { description: 'OK' }, ...commonResponses } },

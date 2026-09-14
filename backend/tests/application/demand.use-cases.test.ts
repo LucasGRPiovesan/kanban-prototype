@@ -184,15 +184,16 @@ function activityOf(repo: InMemoryDemandRepository, recorder: ActivityRecorder =
 }
 
 /**
- * DEMAND_VIEW_ALL is added unless the caller already named it, because every test here
- * is about something else — moving a card, transferring a project, creating with a
- * status — and none of them is about whose demand it is. Leaving it out would make each
- * of them silently depend on the test actor happening to be the demand's responsible,
- * which is exactly the kind of accidental coupling that makes a suite brittle. The rule
- * itself is asserted on its own, with `actorWithoutViewAll`, further down.
+ * DEMAND_VIEW_ALL and DEMAND_MANAGE_ALL are added unless the caller already named them,
+ * because every test here is about something else — moving a card, transferring a
+ * project, creating with a status — and none of them is about whose demand it is.
+ * Leaving them out would make each of them silently depend on the test actor happening
+ * to be the demand's responsible or creator, which is exactly the kind of accidental
+ * coupling that makes a suite brittle. Both rules are asserted on their own, with
+ * `actorWithoutViewAll` and the ownership-focused tests, further down.
  */
 function actor(userUuid: Uuid, permissions: string[]): Actor {
-  return actorWithoutViewAll(userUuid, [...permissions, 'DEMAND_VIEW_ALL']);
+  return actorWithoutViewAll(userUuid, [...permissions, 'DEMAND_VIEW_ALL', 'DEMAND_MANAGE_ALL']);
 }
 
 function actorWithoutViewAll(userUuid: Uuid, permissions: string[]): Actor {
@@ -293,6 +294,60 @@ describe('Demand visibility without DEMAND_VIEW_ALL', () => {
         actor(READER, ['DEMAND_ACCESS', 'PROJECT_ACCESS']),
         demand.uuid.toString(),
       ),
+    ).resolves.toBeDefined();
+  });
+});
+
+/**
+ * Seeing a demand and being trusted to change it are different questions —
+ * `loadManageable` is the write-side counterpart of `loadAccessible`, and
+ * DEMAND_VIEW_ALL is deliberately not enough to satisfy it on its own.
+ */
+describe('Demand management without DEMAND_MANAGE_ALL', () => {
+  const ACTOR = Uuid.generate();
+  let repo: InMemoryDemandRepository;
+  let guard: DemandAccessGuard;
+
+  beforeEach(() => {
+    repo = new InMemoryDemandRepository();
+    const members = new InMemoryMemberRepository({ [ACTOR.toString()]: [PROJECT_A.toString()] });
+    guard = new DemandAccessGuard(repo, new ProjectAccessResolver(members));
+  });
+
+  // DEMAND_VIEW_ALL alone: sees the whole board, but nothing on it is theirs yet.
+  const viewer = (extra: string[] = []) =>
+    actorWithoutViewAll(ACTOR, ['DEMAND_ACCESS', 'PROJECT_ACCESS', 'DEMAND_VIEW_ALL', ...extra]);
+
+  it('refuses to manage a demand of someone else, even with DEMAND_VIEW_ALL', async () => {
+    const demand = seedDemand(repo, 'IN_PROGRESS');
+    await expect(
+      guard.loadManageable(viewer(), demand.uuid.toString()),
+    ).rejects.toMatchObject({ code: 'DEMAND_NOT_OWN' });
+  });
+
+  it('allows managing a demand the actor is responsible for, without DEMAND_MANAGE_ALL', async () => {
+    const demand = seedDemand(repo, 'IN_PROGRESS');
+    demand.assignResponsible(ACTOR);
+    await expect(guard.loadManageable(viewer(), demand.uuid.toString())).resolves.toBeDefined();
+  });
+
+  it('allows managing a demand the actor created but does not hold', async () => {
+    const demand = Demand.create({
+      projectUuid: PROJECT_A,
+      title: 'Demanda criada pelo ator',
+      description: RichText.fromSanitizedHtml('<p>Descrição da demanda.</p>'),
+      dueDate: CalendarDate.fromISO('2026-12-01'),
+      responsibleUserUuid: RESPONSIBLE,
+      createdByUserUuid: ACTOR,
+    });
+    repo.demands.set(demand.uuid.toString(), demand);
+    await expect(guard.loadManageable(viewer(), demand.uuid.toString())).resolves.toBeDefined();
+  });
+
+  it('allows managing a demand of someone else once DEMAND_MANAGE_ALL is granted', async () => {
+    const demand = seedDemand(repo, 'IN_PROGRESS');
+    await expect(
+      guard.loadManageable(viewer(['DEMAND_MANAGE_ALL']), demand.uuid.toString()),
     ).resolves.toBeDefined();
   });
 });

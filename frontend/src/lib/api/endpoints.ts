@@ -189,6 +189,13 @@ export const demandsApi = {
       /** `null` detaches the demand from its project; omitted leaves it untouched. */
       projectUuid?: string | null;
       priority?: DemandPriority;
+      /**
+       * Optional so `move` below stays the endpoint for a status change on its own
+       * (drag-and-drop); accepted here too so the edit form's "Salvar" — which may also
+       * rename the demand, say — reaches the server as the one save it actually is,
+       * instead of this call plus a second `move` producing two separate notifications.
+       */
+      status?: DemandStatus;
     },
   ) => api.patch<{ uuid: string }>(`/demands/${uuid}`, input),
   move: (uuid: string, status: DemandStatus) =>

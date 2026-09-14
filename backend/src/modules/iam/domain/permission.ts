@@ -12,6 +12,7 @@ export const PERMISSION_CODES = [
   'DEMAND_CREATE',
   'DEMAND_CREATE_WITH_STATUS',
   'DEMAND_UPDATE',
+  'DEMAND_MANAGE_ALL',
   'DEMAND_UPDATE_PRIORITY',
   'DEMAND_UPDATE_DUE_DATE',
   'DEMAND_UPDATE_RESPONSIBLE',
@@ -106,6 +107,13 @@ export const PERMISSION_CATALOG: readonly PermissionDefinition[] = [
   // demand to also need a second, separately-granted permission just to change where it
   // sits on the board.
   { code: 'DEMAND_UPDATE', module: 'DEMAND', action: 'UPDATE', description: 'Gerenciar demandas existentes (editar e alterar status)' },
+  // The write-side twin of DEMAND_VIEW_ALL, and just as deliberately not implied by it:
+  // seeing every demand on the board is a reading concern, and being trusted to edit,
+  // move, archive, delete or touch the checklist of work that is neither yours nor one
+  // you created is a separate decision an administrator makes on purpose. Without this,
+  // DEMAND_UPDATE (and everything that depends on it below) only reaches a demand where
+  // the actor is the responsible or the creator — see `DemandAccessGuard.loadManageable`.
+  { code: 'DEMAND_MANAGE_ALL', module: 'DEMAND', action: 'MANAGE_ALL', description: 'Gerenciar demandas de qualquer pessoa, e não apenas as suas', dependsOn: 'DEMAND_UPDATE' },
   // Children of DEMAND_UPDATE, the same way DEMAND_CREATE_WITH_STATUS is a child of
   // DEMAND_CREATE: PermissionSet's own ACCESS cascade only reaches as far as a module's
   // ACCESS, so the "inert without DEMAND_UPDATE" half of that relationship is asserted

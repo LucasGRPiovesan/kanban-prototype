@@ -61,6 +61,7 @@ escopo na demanda.
 | `DEMAND_CREATE` | Cadastrar novas demandas |
 | `DEMAND_CREATE_WITH_STATUS` | Criação de demanda por status |
 | `DEMAND_UPDATE` | Gerenciar demandas existentes (editar e alterar status) |
+| `DEMAND_MANAGE_ALL` | Gerenciar demandas de qualquer pessoa, e não apenas as suas |
 | `DEMAND_UPDATE_PRIORITY` | Alterar a prioridade de uma demanda |
 | `DEMAND_UPDATE_DUE_DATE` | Alterar o prazo de uma demanda |
 | `DEMAND_UPDATE_RESPONSIBLE` | Alterar o responsável por uma demanda |
@@ -80,6 +81,16 @@ de o requisito existir.
 status** — mover um card (arrastar ou pelo seletor no painel) é uma mudança de escopo
 sobre uma demanda que já existe, não uma ação de domínio própria.
 
+**`DEMAND_MANAGE_ALL` é o par de `DEMAND_VIEW_ALL` do lado da escrita, e propositalmente
+não implícito por ele.** Ver o quadro inteiro é uma questão de leitura; ser confiado para
+editar, mover, arquivar, excluir ou mexer no checklist de uma demanda que não é sua nem
+foi criada por você é uma concessão separada, decidida à parte. Sem `DEMAND_MANAGE_ALL`,
+`DEMAND_UPDATE` (e tudo que depende dela) só alcança demandas das quais o ator é
+responsável ou autor — a mesma regra que `DemandAccessGuard.loadManageable` aplica no
+backend, independentemente de `DEMAND_VIEW_ALL` já deixar essas mesmas demandas visíveis
+no quadro. Tentar gerenciar uma demanda alheia sem essa permissão responde `403
+DEMAND_NOT_OWN` (não `404`: a demanda é visível, só a escrita é recusada).
+
 **Prioridade, prazo, responsável e projeto exigem, cada um, uma permissão própria além
 de `DEMAND_UPDATE`** — a mesma relação de dependência de `DEMAND_CREATE_WITH_STATUS` com
 `DEMAND_CREATE`: inerte sem o pai, e verificada no caso de uso (`UpdateDemand`), não pela
@@ -88,8 +99,11 @@ cascata automática de ACCESS do `PermissionSet` (que só alcança a ACCESS do m
 enunciado do escopo; as quatro filhas existem para um perfil mais restrito: alguém pode
 renomear uma demanda, reescrever sua descrição e movê-la pelo quadro sem também poder
 repriorizá-la, adiar seu prazo, reatribuí-la ou transferi-la para outro projeto. Na seed,
-o Agilista tem as quatro; o Desenvolvedor tem `DEMAND_UPDATE` mas nenhuma delas — pode
-gerenciar a demanda no sentido restrito, mas essas quatro decisões ficam com o Agilista.
+o Agilista tem as quatro e também `DEMAND_MANAGE_ALL` — o papel de coordenar o quadro do
+time inteiro pressupõe gerenciar cards que não são dela. O Desenvolvedor tem
+`DEMAND_UPDATE` mas nenhuma delas nem `DEMAND_MANAGE_ALL` — pode gerenciar suas próprias
+demandas no sentido restrito; tanto essas quatro decisões quanto qualquer card alheio
+ficam com o Agilista.
 
 `DEMAND_MANAGE_PRODUCTION` é a única exceção controlada à regra de que produção é
 terminal ([requisito adicionado #41](ADDED_REQUIREMENTS.md#41-produção-reversível-para-quem-gerencia)).
@@ -168,6 +182,7 @@ DEMAND_ACCESS
   ├── DEMAND_VIEW_ALL
   ├── DEMAND_CREATE
   ├── DEMAND_UPDATE
+  │     ├── DEMAND_MANAGE_ALL           (idem — sem ela, só demandas próprias)
   │     ├── DEMAND_UPDATE_PRIORITY      (verificada em UpdateDemand, não pela cascata de ACCESS)
   │     ├── DEMAND_UPDATE_DUE_DATE      (idem)
   │     ├── DEMAND_UPDATE_RESPONSIBLE   (idem)
@@ -225,6 +240,7 @@ restaurados por `npm run db:seed`.
 | `DEMAND_CREATE` | ✅ | ✅ | ❌ |
 | `DEMAND_CREATE_WITH_STATUS` | ❌ | ✅ | ❌ |
 | `DEMAND_UPDATE` | ❌ | ✅ | ✅ |
+| `DEMAND_MANAGE_ALL` | ❌ | ✅ | ❌ |
 | `DEMAND_UPDATE_PRIORITY` | ❌ | ✅ | ❌ |
 | `DEMAND_UPDATE_DUE_DATE` | ❌ | ✅ | ❌ |
 | `DEMAND_UPDATE_RESPONSIBLE` | ❌ | ✅ | ❌ |
@@ -250,7 +266,7 @@ restaurados por `npm run db:seed`.
 | `LOG_VIEW_SYSTEM` | ✅ | ❌ | ❌ |
 | `ASSISTANT_ACCESS` | ✅ | ✅ | ✅ |
 | `ASSISTANT_MANAGE` | ✅ | ❌ | ❌ |
-| **Total** | **19** | **11** | **6** |
+| **Total** | **19** | **12** | **6** |
 
 Note que o Administrador **não** possui `DEMAND_UPDATE` (o que também cobre mover cards no
 Kanban), nem `DEMAND_DELETE` nem `DEMAND_BE_ASSIGNEE` — exatamente como o escopo original
@@ -295,18 +311,18 @@ Cada regra funcional do PDF mapeada para a permissão que a implementa:
 | Pode excluir demandas | `DEMAND_DELETE` ✅ |
 | **Não** pode cadastrar usuários | `USER_CREATE` ausente ✅ |
 | Pode acessar o Kanban | `DEMAND_ACCESS` ✅ |
-| Pode mover cards no Kanban | `DEMAND_UPDATE` ✅ |
-| Pode excluir cards no Kanban | `DEMAND_DELETE` ✅ |
-| Pode editar cards no Kanban | `DEMAND_UPDATE` ✅ |
+| Pode mover **qualquer** card no Kanban | `DEMAND_UPDATE` + `DEMAND_MANAGE_ALL` ✅ |
+| Pode excluir **qualquer** card no Kanban | `DEMAND_DELETE` + `DEMAND_MANAGE_ALL` ✅ |
+| Pode editar **qualquer** card no Kanban | `DEMAND_UPDATE` + `DEMAND_MANAGE_ALL` ✅ |
 
 ### Desenvolvedor
 
 | Regra do escopo | Permissão |
 |---|---|
 | Pode acessar o Kanban | `DEMAND_ACCESS` ✅ |
-| Pode mover cards no Kanban | `DEMAND_UPDATE` ✅ |
+| Pode mover **suas próprias** cards no Kanban | `DEMAND_UPDATE` ✅ (sem `DEMAND_MANAGE_ALL`, um card alheio responde 403) |
 | Pode acessar cards no Kanban | `DEMAND_ACCESS` ✅ |
-| Pode editar card no Kanban | `DEMAND_UPDATE` ✅ |
+| Pode editar **suas próprias** cards no Kanban | `DEMAND_UPDATE` ✅ (idem) |
 
 `DEMAND_VIEW_ALL` é concedida aos três perfis porque o escopo original descreve um quadro
 compartilhado — quem está alocado num projeto vê o trabalho daquele projeto — e a seed
@@ -333,7 +349,7 @@ também assuma demandas sem alteração de código.
 
 ## Autorização por projeto
 
-Para acessar uma demanda:
+Para **ler** uma demanda (listagem, detalhe, comentários, histórico):
 
 1. o usuário possui `DEMAND_ACCESS`; **e**
 2. o usuário tem acesso ao projeto da demanda; **e**
@@ -347,9 +363,19 @@ O acesso ao projeto existe quando:
 - existe `ProjectMember` ligando usuário e projeto; **ou**
 - o usuário possui `PROJECT_ACCESS_ALL`.
 
-Aplicado uniformemente em: listagem, detalhe, criação, atualização, exclusão,
-movimentação e anexos. `DemandAccessGuard.loadAccessible()` é o único caminho até uma
-demanda, o que impede que um endpoint futuro esqueça o segundo critério.
+Aplicado uniformemente em toda leitura. `DemandAccessGuard.loadAccessible()` é o único
+caminho até uma demanda para leitura, o que impede que um endpoint futuro esqueça o
+segundo critério.
+
+**Gerenciar uma demanda** (atualização, exclusão, movimentação de status, checklist,
+anexos) exige tudo isso e mais um critério: `DEMAND_MANAGE_ALL` **ou** ser responsável
+pela demanda ou seu autor — o critério 3 sozinho (`DEMAND_VIEW_ALL`) não basta. Ver a
+demanda e ser confiado para alterá-la são perguntas diferentes: um perfil pode enxergar
+o quadro inteiro do time por contexto sem por isso poder mexer no trabalho de outra
+pessoa. `DemandAccessGuard.loadManageable()` é o único caminho até uma demanda para
+escrita — chama `loadAccessible()` primeiro e então aplica esse critério a mais,
+respondendo `403 DEMAND_NOT_OWN` (não `404`, já que a demanda é visível) quando ele
+falha.
 
 **Projeto inacessível responde `404 PROJECT_NOT_FOUND`, não `403`.** Confirmar que um
 projeto existe já vazaria informação através da fronteira de isolamento.

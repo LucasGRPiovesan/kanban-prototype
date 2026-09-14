@@ -14,6 +14,7 @@ const FIELD_LABELS: Record<string, string> = {
   title: 'título',
   description: 'descrição',
   dueDate: 'prazo',
+  status: 'status',
   responsible: 'responsável',
   project: 'projeto',
   name: 'nome',

@@ -1,5 +1,5 @@
 import { useEffect, useId, useState } from 'react';
-import { MessageSquare, Pencil, Reply, Send, Trash2 } from 'lucide-react';
+import { CornerDownRight, MessageSquare, Pencil, Send, Trash2 } from 'lucide-react';
 import { useAuth } from '@/app/providers/AuthProvider';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button, IconButton } from '@/components/ui/Button';
@@ -446,33 +446,21 @@ function CommentItem({
               (editado)
             </span>
           )}
-          {!editing && (comment.canEdit || canReply) && (
+          {!editing && comment.canEdit && (
             // Always visible on touch screens, where there is no hover to reveal them.
             <span className="ml-auto flex items-center transition-opacity duration-150 sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100">
-              {canReply && (
-                <IconButton
-                  label={replying ? 'Cancelar resposta' : 'Responder comentário'}
-                  icon={<Reply className="h-3.5 w-3.5" />}
-                  onClick={onReply}
-                  className={cn('h-7 w-7', replying && 'text-brand-700')}
-                />
-              )}
-              {comment.canEdit && (
-                <>
-                  <IconButton
-                    label="Editar comentário"
-                    icon={<Pencil className="h-3.5 w-3.5" />}
-                    onClick={onStartEditing}
-                    className="h-7 w-7"
-                  />
-                  <IconButton
-                    label="Excluir comentário"
-                    icon={<Trash2 className="h-3.5 w-3.5" />}
-                    onClick={onDelete}
-                    className="h-7 w-7 hover:text-danger"
-                  />
-                </>
-              )}
+              <IconButton
+                label="Editar comentário"
+                icon={<Pencil className="h-3.5 w-3.5" />}
+                onClick={onStartEditing}
+                className="h-7 w-7"
+              />
+              <IconButton
+                label="Excluir comentário"
+                icon={<Trash2 className="h-3.5 w-3.5" />}
+                onClick={onDelete}
+                className="h-7 w-7 hover:text-danger"
+              />
             </span>
           )}
         </div>
@@ -516,15 +504,37 @@ function CommentItem({
             </div>
           </div>
         ) : (
-          <p
-            className={cn(
-              'whitespace-pre-wrap break-words rounded-xl rounded-tl-sm px-3.5 py-2.5 text-sm leading-relaxed text-body',
-              // Your own words sit on the brand tint, the way a chat tells you apart.
-              comment.canEdit ? 'bg-brand-100' : 'bg-surface-muted',
+          <>
+            <p
+              className={cn(
+                'whitespace-pre-wrap break-words rounded-xl rounded-tl-sm px-3.5 py-2.5 text-sm leading-relaxed text-body',
+                // Your own words sit on the brand tint, the way a chat tells you apart.
+                comment.canEdit ? 'bg-brand-100' : 'bg-surface-muted',
+              )}
+            >
+              {comment.body}
+            </p>
+
+            {/*
+              Below the comment it answers, not beside its author line — the arrow points
+              the same way the reply itself will land: down, then indented right. Placed
+              here rather than as an icon up top, a reply reads as something the comment
+              grows, not a generic row action alongside edit and delete.
+            */}
+            {canReply && (
+              <button
+                type="button"
+                onClick={onReply}
+                className={cn(
+                  'flex items-center gap-1 text-xs font-semibold transition-colors duration-150',
+                  replying ? 'text-brand-700' : 'text-subtle hover:text-body',
+                )}
+              >
+                <CornerDownRight className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                {replying ? 'Cancelar resposta' : 'Responder'}
+              </button>
             )}
-          >
-            {comment.body}
-          </p>
+          </>
         )}
       </div>
     </li>

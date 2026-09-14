@@ -90,6 +90,14 @@ export const SYSTEM_ROLES = [
       'DEMAND_CREATE',
       'DEMAND_CREATE_WITH_STATUS',
       'DEMAND_UPDATE',
+      /*
+       * Without this, DEMAND_UPDATE (and everything below that depends on it) would only
+       * reach demands the Agilista is responsible for or created — the same restriction
+       * DEMAND_VIEW_ALL alone leaves a Desenvolvedor under. An Agilista coordinates the
+       * whole team's board, so managing work that belongs to someone else is exactly the
+       * job, not an oversight to close.
+       */
+      'DEMAND_MANAGE_ALL',
       'DEMAND_UPDATE_PRIORITY',
       'DEMAND_UPDATE_DUE_DATE',
       'DEMAND_UPDATE_RESPONSIBLE',
@@ -123,12 +131,15 @@ export const SYSTEM_ROLES = [
        * created, with no code change and no re-seed.
        */
       'DEMAND_VIEW_ALL',
-      // DEMAND_UPDATE without any of its four field-level children on purpose: a
-      // Desenvolvedor can rename a demand, rewrite its description and move it through
-      // the board, but reprioritizing it, pushing its deadline, handing it to someone
-      // else, or moving it to another project are left to the Agilista — the "acesso
-      // mais restrito" the specification's own division of labour implies for this
-      // profile.
+      // DEMAND_UPDATE without DEMAND_MANAGE_ALL or any of the four field-level children,
+      // on purpose. Without DEMAND_MANAGE_ALL, this only reaches demands the
+      // Desenvolvedor is responsible for or created — DEMAND_VIEW_ALL widens what the
+      // shared board *shows*, not whose cards may be worked, so seeing the whole team's
+      // Kanban does not also mean managing it. On their own demands, a Desenvolvedor can
+      // rename, rewrite the description and move it through the board, but
+      // reprioritizing it, pushing its deadline, handing it to someone else, or moving it
+      // to another project are left to the Agilista — the "acesso mais restrito" the
+      // specification's own division of labour implies for this profile.
       'DEMAND_UPDATE',
       'DEMAND_BE_ASSIGNEE',
       'PROJECT_ACCESS',

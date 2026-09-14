@@ -60,7 +60,7 @@ export class UploadAttachments {
     files: IncomingFile[],
   ): Promise<DemandAttachmentDTO[]> {
     actor.require('DEMAND_UPDATE');
-    const demand = await this.guard.loadAccessible(actor, demandUuid);
+    const demand = await this.guard.loadManageable(actor, demandUuid);
 
     if (files.length === 0) {
       throw DomainError.validation('NO_FILES', 'Nenhum arquivo enviado.');
@@ -153,7 +153,7 @@ export class DeleteAttachment {
 
   async execute(actor: Actor, demandUuid: string, attachmentUuid: string): Promise<void> {
     actor.require('DEMAND_UPDATE');
-    const demand = await this.guard.loadAccessible(actor, demandUuid);
+    const demand = await this.guard.loadManageable(actor, demandUuid);
 
     if (!Uuid.isValid(attachmentUuid)) {
       throw DomainError.notFound('ATTACHMENT_NOT_FOUND', 'Anexo não encontrado.');

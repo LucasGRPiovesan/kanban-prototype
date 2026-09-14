@@ -122,6 +122,10 @@ const updateSchema = z
     // `null` detaches the demand from its project; omitted leaves it untouched.
     projectUuid: z.string().uuid().nullable().optional(),
     priority: z.enum(DEMAND_PRIORITIES).optional(),
+    // Optional so `PATCH /:uuid/status` stays the endpoint for a status change on its
+    // own (drag-and-drop); accepted here too so an edit that also renames the demand,
+    // say, records and notifies as the one save it actually was.
+    status: z.enum(DEMAND_STATUSES).optional(),
   })
   .refine((v) => Object.keys(v).length > 0, { message: 'Informe ao menos um campo.' });
 

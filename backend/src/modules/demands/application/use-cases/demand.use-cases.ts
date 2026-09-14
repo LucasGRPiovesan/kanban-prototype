@@ -83,6 +83,32 @@ export class DemandAccessGuard {
     }
     return demand;
   }
+
+  /**
+   * The write-side counterpart of `loadAccessible`, used by every use case that
+   * actually changes a demand (or something that hangs off it — a checklist item, an
+   * attachment) rather than merely reading one.
+   *
+   * DEMAND_VIEW_ALL is deliberately not enough here. It widens what a shared board
+   * shows, not who may act on someone else's work — a Desenvolvedor reading the whole
+   * team's Kanban for context has not thereby been trusted to rename or move cards
+   * that were never assigned to them. That trust is DEMAND_MANAGE_ALL, granted on its
+   * own (see the Agilista's seeded profile, which holds both).
+   *
+   * Reported as 403, not 404: unlike `loadAccessible`'s visibility check, the actor
+   * has already legitimately seen this demand by the time this runs — what is refused
+   * is the write, not the demand's existence.
+   */
+  async loadManageable(actor: Actor, demandUuid: string): Promise<Demand> {
+    const demand = await this.loadAccessible(actor, demandUuid);
+    if (!actor.canManageAllDemands() && !isOwnDemand(actor, demand)) {
+      throw DomainError.forbidden(
+        'DEMAND_NOT_OWN',
+        'Você só pode gerenciar demandas das quais é responsável ou que você criou.',
+      );
+    }
+    return demand;
+  }
 }
 
 /** Responsible or author — the two ways a demand is someone's own. */
@@ -419,10 +445,18 @@ export class UpdateDemand {
       /** `null` detaches the demand from its project; `undefined` leaves it untouched. */
       projectUuid?: string | null;
       priority?: string;
+      /**
+       * Optional so the drag-and-drop endpoint (`MoveDemand`) stays the primary path for a
+       * status change on its own. Accepted here too so an edit that also touches other
+       * fields records as the one event it actually was — a title rename and a status
+       * change made in the same save are one act, not two, and a reader (or a recipient's
+       * inbox) should see them that way.
+       */
+      status?: string;
     },
   ): Promise<{ uuid: string }> {
     actor.require('DEMAND_UPDATE');
-    const demand = await this.guard.loadAccessible(actor, demandUuid);
+    const demand = await this.guard.loadManageable(actor, demandUuid);
     const before = await this.activity.snapshot(demand.uuid);
 
     /*
@@ -487,6 +521,14 @@ export class UpdateDemand {
     }
     if (input.priority !== undefined) {
       demand.changePriority(Demand.assertPriority(input.priority));
+    }
+    if (input.status !== undefined) {
+      const targetStatus = Demand.assertStatus(input.status);
+      // Same no-op-is-not-an-event rule `MoveDemand` applies: re-saving the column
+      // the demand is already in changes nothing.
+      if (targetStatus !== demand.status) {
+        demand.moveTo(targetStatus, { override: actor.can('DEMAND_MANAGE_PRODUCTION') });
+      }
     }
 
     // A project transfer re-opens the eligibility question even when the caller said
@@ -569,6 +611,13 @@ export async function recordEdits(
   if (before.dueDate !== after.dueDate) {
     edits.push({ field: 'dueDate', from: before.dueDate, to: after.dueDate });
   }
+  if (before.status !== after.status) {
+    // Folded in here rather than getting its own `demand.status_changed` entry: this
+    // helper runs for a general edit, and a status change made alongside other fields
+    // in the same request is one act — the dedicated event is for `MoveDemand`, which
+    // is genuinely the only thing that happened on a drag-and-drop move.
+    edits.push({ field: 'status', from: before.status, to: after.status });
+  }
   if (before.priority !== after.priority) {
     edits.push({ field: 'priority', from: before.priority, to: after.priority });
   }
@@ -603,7 +652,7 @@ export class MoveDemand {
     targetStatus: string,
   ): Promise<{ uuid: string; status: DemandStatusValue }> {
     actor.require('DEMAND_UPDATE');
-    const demand = await this.guard.loadAccessible(actor, demandUuid);
+    const demand = await this.guard.loadManageable(actor, demandUuid);
 
     const from = demand.status;
     demand.moveTo(Demand.assertStatus(targetStatus), { override: actor.can('DEMAND_MANAGE_PRODUCTION') });
@@ -645,7 +694,7 @@ export class ArchiveDemand {
 
   async execute(actor: Actor, demandUuid: string, archived: boolean): Promise<{ uuid: string; archived: boolean }> {
     actor.requireAll(['DEMAND_UPDATE', 'DEMAND_ARCHIVE']);
-    const demand = await this.guard.loadAccessible(actor, demandUuid);
+    const demand = await this.guard.loadManageable(actor, demandUuid);
 
     // Setting it to what it already is changes nothing, and nothing is not an event.
     if (demand.archived === archived) {
@@ -702,7 +751,7 @@ export class DeleteDemand {
     // about a demand someone is trusted to manage, so a profile with no DEMAND_UPDATE has
     // no business erasing one either.
     actor.requireAll(['DEMAND_UPDATE', 'DEMAND_DELETE']);
-    const demand = await this.guard.loadAccessible(actor, demandUuid);
+    const demand = await this.guard.loadManageable(actor, demandUuid);
 
     // Archived is read-only except for unarchiving itself — see Demand.assertNotArchived.
     // Deleting bypasses the aggregate's own mutators (there is nothing left to mutate),
@@ -762,7 +811,7 @@ export class AddChecklistItem {
 
   async execute(actor: Actor, demandUuid: string, title: string): Promise<{ uuid: string }> {
     actor.require('DEMAND_UPDATE');
-    const demand = await this.guard.loadAccessible(actor, demandUuid);
+    const demand = await this.guard.loadManageable(actor, demandUuid);
     const item = ChecklistItem.create({ title, position: demand.nextChecklistPosition() });
     demand.addChecklistItem(item);
 
@@ -791,7 +840,7 @@ export class UpdateChecklistItem {
     input: { title?: string; done?: boolean },
   ): Promise<void> {
     actor.require('DEMAND_UPDATE');
-    const demand = await this.guard.loadAccessible(actor, demandUuid);
+    const demand = await this.guard.loadManageable(actor, demandUuid);
     const uuid = parseUuid(itemUuid, 'CHECKLIST_ITEM_NOT_FOUND', 'Item não encontrado.');
 
     // Primitives, not the item: the aggregate mutates the same object in place.
@@ -847,7 +896,7 @@ export class RemoveChecklistItem {
 
   async execute(actor: Actor, demandUuid: string, itemUuid: string): Promise<void> {
     actor.require('DEMAND_UPDATE');
-    const demand = await this.guard.loadAccessible(actor, demandUuid);
+    const demand = await this.guard.loadManageable(actor, demandUuid);
     const removed = demand.removeChecklistItem(
       parseUuid(itemUuid, 'CHECKLIST_ITEM_NOT_FOUND', 'Item não encontrado.'),
     );

@@ -100,7 +100,7 @@ export function DemandDetailsPanel({
   projectUuid?: string;
 }) {
   const { notify } = useToast();
-  const { can } = useAuth();
+  const { can, session } = useAuth();
   const navigate = useNavigate();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [pendingProductionMove, setPendingProductionMove] = useState(false);
@@ -126,16 +126,31 @@ export function DemandDetailsPanel({
   const isArchived = demand?.archived ?? false;
   const canManageProduction = can('DEMAND_MANAGE_PRODUCTION');
   const hasUpdate = can('DEMAND_UPDATE');
+  /*
+   * Seeing a demand and being trusted to change it are different questions.
+   * DEMAND_VIEW_ALL (or simply being allocated to the project) is what put this demand
+   * in front of the actor at all; whether they may also manage it is DEMAND_MANAGE_ALL,
+   * or — absent that — being the one it's actually theirs to work: its responsible or
+   * whoever created it. Without either, DEMAND_UPDATE has nothing to act on here, the
+   * same way the server's own `DemandAccessGuard.loadManageable` refuses the write.
+   */
+  const canManageThisDemand =
+    can('DEMAND_MANAGE_ALL') ||
+    Boolean(
+      demand &&
+        session &&
+        (demand.responsible.uuid === session.user.uuid || demand.createdBy.uuid === session.user.uuid),
+    );
   // Production freezes the record; the server refuses these writes regardless. Archived
   // overrides every permission the same way — the one door left open is unarchiving
   // itself (the header button) and, while the responsible is inactive, reassigning it
   // (ReassignResponsibleDialog) — neither goes through this flag.
-  const canEditFields = hasUpdate && !isTerminal && !isArchived;
+  const canEditFields = hasUpdate && canManageThisDemand && !isTerminal && !isArchived;
   // Status stays interactive even in produção, for anyone with DEMAND_UPDATE — the
   // selector is always reachable, so what to do about a locked demand is explained on
   // selection rather than by hiding the control outright. Archived is the one exception
   // that does lock it: there is no in-between state to explain, only "desarquive primeiro".
-  const canChangeStatus = hasUpdate && !isArchived;
+  const canChangeStatus = hasUpdate && canManageThisDemand && !isArchived;
 
   /*
    * Priority, prazo, responsável and projeto are each governed by their own capability
@@ -151,14 +166,26 @@ export function DemandDetailsPanel({
   const canEditResponsible = canEditFields && can('DEMAND_UPDATE_RESPONSIBLE');
   const canEditProject = canEditFields && can('DEMAND_UPDATE_PROJECT');
 
-  const baseLockReason = fieldLockReason({ archived: isArchived, isTerminal, hasUpdate });
+  const baseLockReason = fieldLockReason({
+    archived: isArchived,
+    isTerminal,
+    hasUpdate,
+    canManageThis: canManageThisDemand,
+  });
   // Status stays interactive through produção (see canChangeStatus above), so isTerminal
-  // never locks it — only archived or a missing DEMAND_UPDATE do.
-  const statusLockReason = fieldLockReason({ archived: isArchived, isTerminal: false, hasUpdate });
+  // never locks it — only archived, a missing DEMAND_UPDATE or not being this demand's
+  // own do.
+  const statusLockReason = fieldLockReason({
+    archived: isArchived,
+    isTerminal: false,
+    hasUpdate,
+    canManageThis: canManageThisDemand,
+  });
   const priorityLockReason = fieldLockReason({
     archived: isArchived,
     isTerminal,
     hasUpdate,
+    canManageThis: canManageThisDemand,
     hasFieldPermission: can('DEMAND_UPDATE_PRIORITY'),
     fieldNoun: 'a prioridade',
   });
@@ -166,6 +193,7 @@ export function DemandDetailsPanel({
     archived: isArchived,
     isTerminal,
     hasUpdate,
+    canManageThis: canManageThisDemand,
     hasFieldPermission: can('DEMAND_UPDATE_DUE_DATE'),
     fieldNoun: 'o prazo',
   });
@@ -173,6 +201,7 @@ export function DemandDetailsPanel({
     archived: isArchived,
     isTerminal,
     hasUpdate,
+    canManageThis: canManageThisDemand,
     hasFieldPermission: can('DEMAND_UPDATE_RESPONSIBLE'),
     fieldNoun: 'o responsável',
   });
@@ -180,6 +209,7 @@ export function DemandDetailsPanel({
     archived: isArchived,
     isTerminal,
     hasUpdate,
+    canManageThis: canManageThisDemand,
     hasFieldPermission: can('DEMAND_UPDATE_PROJECT'),
     fieldNoun: 'o projeto',
   });
@@ -348,34 +378,43 @@ export function DemandDetailsPanel({
                 place. Same DEMAND_UPDATE the route itself requires; disabled rather than
                 hidden while frozen, the same treatment Excluir gets below.
               */}
-              <PermissionGate permission="DEMAND_UPDATE">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  icon={<Pencil className="h-4 w-4" />}
-                  onClick={() => navigate(`/demandas/${demand.uuid}/editar`)}
-                  disabled={isTerminal || isArchived}
-                >
-                  Editar
-                </Button>
-              </PermissionGate>
-              <PermissionGate permission="DEMAND_ARCHIVE">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  icon={
-                    demand.archived ? (
-                      <ArchiveRestore className="h-4 w-4" />
-                    ) : (
-                      <Archive className="h-4 w-4" />
-                    )
-                  }
-                  onClick={handleArchiveToggle}
-                  loading={archiveMutation.isPending}
-                >
-                  {demand.archived ? 'Desarquivar' : 'Arquivar'}
-                </Button>
-              </PermissionGate>
+              {/*
+                Hidden, not merely disabled, when the demand isn't this actor's to
+                manage — DEMAND_UPDATE/DEMAND_ARCHIVE alone say what the profile can do
+                in general, not that this particular card is theirs to act on.
+              */}
+              {canManageThisDemand && (
+                <>
+                  <PermissionGate permission="DEMAND_UPDATE">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      icon={<Pencil className="h-4 w-4" />}
+                      onClick={() => navigate(`/demandas/${demand.uuid}/editar`)}
+                      disabled={isTerminal || isArchived}
+                    >
+                      Editar
+                    </Button>
+                  </PermissionGate>
+                  <PermissionGate permission="DEMAND_ARCHIVE">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      icon={
+                        demand.archived ? (
+                          <ArchiveRestore className="h-4 w-4" />
+                        ) : (
+                          <Archive className="h-4 w-4" />
+                        )
+                      }
+                      onClick={handleArchiveToggle}
+                      loading={archiveMutation.isPending}
+                    >
+                      {demand.archived ? 'Desarquivar' : 'Arquivar'}
+                    </Button>
+                  </PermissionGate>
+                </>
+              )}
             </>
           )
         }
@@ -392,14 +431,16 @@ export function DemandDetailsPanel({
               )}
 
               <PermissionGate permission="DEMAND_DELETE">
-                <Button
-                  variant="danger-outline"
-                  icon={<Trash2 className="h-4 w-4" />}
-                  onClick={() => setConfirmingDelete(true)}
-                  disabled={isTerminal || isArchived}
-                >
-                  Excluir
-                </Button>
+                {canManageThisDemand && (
+                  <Button
+                    variant="danger-outline"
+                    icon={<Trash2 className="h-4 w-4" />}
+                    onClick={() => setConfirmingDelete(true)}
+                    disabled={isTerminal || isArchived}
+                  >
+                    Excluir
+                  </Button>
+                )}
               </PermissionGate>
             </>
           )
@@ -638,6 +679,7 @@ export function fieldLockReason({
   archived,
   isTerminal,
   hasUpdate,
+  canManageThis = true,
   hasFieldPermission,
   fieldNoun,
 }: {
@@ -645,6 +687,12 @@ export function fieldLockReason({
   archived?: boolean;
   isTerminal: boolean;
   hasUpdate: boolean;
+  /**
+   * Whether the actor may manage this specific demand — false when it is neither
+   * theirs (responsible or creator) nor covered by DEMAND_MANAGE_ALL. Defaults to
+   * `true` for callers that have not computed the ownership rule.
+   */
+  canManageThis?: boolean;
   /** Omit for a field with no capability beyond plain DEMAND_UPDATE (title, description). */
   hasFieldPermission?: boolean;
   /** e.g. "a prioridade" — read into "Você não tem permissão para alterar {fieldNoun}". */
@@ -658,6 +706,9 @@ export function fieldLockReason({
   }
   if (!hasUpdate) {
     return 'Você não tem permissão para gerenciar demandas';
+  }
+  if (!canManageThis) {
+    return 'Você só pode gerenciar demandas das quais é responsável ou que criou';
   }
   if (hasFieldPermission === false) {
     return `Você não tem permissão para alterar ${fieldNoun}`;

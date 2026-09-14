@@ -54,4 +54,14 @@ export class Actor {
   canViewAllDemands(): boolean {
     return this.can('DEMAND_VIEW_ALL');
   }
+
+  /**
+   * True when the actor may change a demand that is neither theirs nor one they
+   * created — not implied by `canViewAllDemands`. Seeing the whole board is a reading
+   * concern; being trusted to edit, move, archive, delete or touch the checklist of
+   * work that belongs to someone else is a different, deliberately separate grant.
+   */
+  canManageAllDemands(): boolean {
+    return this.can('DEMAND_MANAGE_ALL');
+  }
 }

@@ -77,7 +77,7 @@ export function DemandFormPage() {
   const navigate = useNavigate();
   const { notify } = useToast();
   const queryClient = useQueryClient();
-  const { can } = useAuth();
+  const { can, session } = useAuth();
   const [searchParams] = useSearchParams();
 
   /**
@@ -253,23 +253,23 @@ export function DemandFormPage() {
        * demand but not edit one — an Administrador, under the seeded matrix — would
        * watch the list they just typed be rejected. It is also one aggregate, so it is
        * one write: no window where a demand exists with half its checklist.
+       *
+       * On an edit, a changed status rides in the same request — one save, one PATCH,
+       * one activity entry and one notification, instead of this call plus a second one
+       * to the status endpoint for what was really a single act.
        */
       const target = isEdit
-        ? await demandsApi.update(uuid!, payload)
+        ? await demandsApi.update(uuid!, {
+            ...payload,
+            ...(statusDraft && statusDraft !== existingQuery.data?.status
+              ? { status: statusDraft }
+              : {}),
+          })
         : await demandsApi.create({
             ...payload,
             checklist: draftChecklist,
             status: targetStatus,
           });
-
-      /*
-       * Status travels through its own endpoint — the one with the produção rules —
-       * but only once "Salvar" is actually pressed, same as every other field: nothing
-       * here reaches the server on selection alone.
-       */
-      if (isEdit && statusDraft && statusDraft !== existingQuery.data?.status) {
-        await demandsApi.move(uuid!, statusDraft);
-      }
 
       if (pendingFiles.length > 0) {
         await demandsApi.uploadAttachments(target.uuid, pendingFiles);
@@ -311,6 +311,25 @@ export function DemandFormPage() {
   const loadingExisting = isEdit && existingQuery.isLoading;
   const isTerminal = existingQuery.data?.isTerminal ?? false;
   const isArchived = existingQuery.data?.archived ?? false;
+  /*
+   * This screen is reachable by its URL directly, not only through a button already
+   * gated on ownership (the details panel's "Editar"). DEMAND_UPDATE alone says the
+   * profile may manage demands in general; whether it may manage *this* one is
+   * DEMAND_MANAGE_ALL, or — absent that — being its responsible or its creator, the
+   * same rule the server's `DemandAccessGuard.loadManageable` enforces regardless.
+   */
+  const canManageThisDemand =
+    !isEdit ||
+    can('DEMAND_MANAGE_ALL') ||
+    Boolean(
+      existingQuery.data &&
+        session &&
+        (existingQuery.data.responsible.uuid === session.user.uuid ||
+          existingQuery.data.createdBy.uuid === session.user.uuid),
+    );
+  // Not this actor's to manage locks the whole form the same way a terminal demand
+  // does — there is nothing here to stage a change against either way.
+  const locked = isTerminal || (isEdit && !canManageThisDemand);
 
   /*
    * Priority, prazo, responsável and projeto each need a capability of their own on top
@@ -331,7 +350,7 @@ export function DemandFormPage() {
    * has nothing here to stage a change against.
    */
   const canManageProduction = can('DEMAND_MANAGE_PRODUCTION');
-  const canChangeStatus = isEdit && can('DEMAND_UPDATE') && !isArchived && !isTerminal;
+  const canChangeStatus = isEdit && can('DEMAND_UPDATE') && canManageThisDemand && !isArchived && !isTerminal;
 
   const handleStatusChange = (status: DemandStatus) => {
     // Entering produção without DEMAND_MANAGE_PRODUCTION is a one-way door — asks for
@@ -401,6 +420,16 @@ export function DemandFormPage() {
           </p>
         )}
 
+        {isEdit && !isTerminal && !canManageThisDemand && (
+          <p
+            role="alert"
+            className="flex items-start gap-2.5 rounded-lg border border-line bg-surface-muted px-4 py-3 text-sm text-body"
+          >
+            <Info className="mt-0.5 h-4 w-4 shrink-0 text-subtle" aria-hidden="true" />
+            Você só pode gerenciar demandas das quais é responsável ou que você criou.
+          </p>
+        )}
+
         <form
           noValidate
           onSubmit={form.handleSubmit((values) => mutation.mutate(values))}
@@ -439,7 +468,7 @@ export function DemandFormPage() {
                       id={id}
                       aria-describedby={describedBy}
                       invalid={invalid}
-                      disabled={isTerminal}
+                      disabled={locked}
                       placeholder="Digite o título da demanda"
                       {...form.register('title')}
                     />
@@ -460,7 +489,7 @@ export function DemandFormPage() {
                           id={id}
                           describedBy={describedBy}
                           invalid={invalid}
-                          disabled={isTerminal}
+                          disabled={locked}
                           value={field.value}
                           onChange={field.onChange}
                           onBlur={field.onBlur}
@@ -481,7 +510,7 @@ export function DemandFormPage() {
                   <DemandChecklist
                     demandUuid={uuid}
                     items={existingQuery.data?.checklist ?? []}
-                    canEdit={!isTerminal}
+                    canEdit={!locked}
                   />
                 ) : (
                   <ChecklistDraft items={draftChecklist} onChange={setDraftChecklist} />
@@ -557,7 +586,7 @@ export function DemandFormPage() {
                           onChange={(value) => field.onChange(value ?? '')}
                           placeholder="Sem projeto"
                           emptyMessage="Projeto não encontrado"
-                          disabled={isTerminal || !canEditProject}
+                          disabled={locked || !canEditProject}
                           loading={projectsQuery.isLoading}
                         />
                       )}
@@ -581,7 +610,7 @@ export function DemandFormPage() {
                           describedBy={describedBy}
                           value={field.value}
                           onChange={field.onChange}
-                          disabled={isTerminal || !canEditPriority}
+                          disabled={locked || !canEditPriority}
                         />
                       )}
                     />
@@ -614,7 +643,7 @@ export function DemandFormPage() {
                           onChange={(value) => field.onChange(value ?? '')}
                           placeholder="Selecione o responsável"
                           emptyMessage="Usuário não encontrado"
-                          disabled={isTerminal || !canEditResponsible}
+                          disabled={locked || !canEditResponsible}
                           loading={assigneesQuery.isLoading}
                         />
                       )}
@@ -656,7 +685,7 @@ export function DemandFormPage() {
                             id={id}
                             aria-describedby={describedBy}
                             invalid={invalid}
-                            disabled={isTerminal || !canEditDueDate}
+                            disabled={locked || !canEditDueDate}
                             inputMode="numeric"
                             placeholder="dd/mm/aaaa"
                             value={field.value}
@@ -672,7 +701,7 @@ export function DemandFormPage() {
                 <AttachmentPicker
                   files={pendingFiles}
                   onChange={setPendingFiles}
-                  disabled={isTerminal}
+                  disabled={locked}
                   existing={existingQuery.data?.attachments ?? []}
                   onRemoveExisting={async (attachmentUuid) => {
                     await demandsApi.removeAttachment(uuid!, attachmentUuid);
@@ -688,7 +717,7 @@ export function DemandFormPage() {
             <Button variant="secondary" onClick={() => navigate(-1)} disabled={mutation.isPending}>
               Cancelar
             </Button>
-            <Button type="submit" loading={mutation.isPending} disabled={isTerminal}>
+            <Button type="submit" loading={mutation.isPending} disabled={locked}>
               Salvar
             </Button>
           </div>
