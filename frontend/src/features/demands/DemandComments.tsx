@@ -507,9 +507,12 @@ function CommentItem({
           <>
             <p
               className={cn(
-                'whitespace-pre-wrap break-words rounded-xl rounded-tl-sm px-3.5 py-2.5 text-sm leading-relaxed text-body',
+                'whitespace-pre-wrap break-words rounded-xl rounded-tl-sm px-3.5 py-2.5 text-sm leading-relaxed',
                 // Your own words sit on the brand tint, the way a chat tells you apart.
-                comment.canEdit ? 'bg-brand-100' : 'bg-surface-muted',
+                // `brand-100` is a fixed pale value in both themes, so the text needs the
+                // matching fixed `text-on-brand` token — `text-body` flips to a near-white
+                // ink in dark mode and would disappear on this light background.
+                comment.canEdit ? 'bg-brand-100 text-on-brand' : 'bg-surface-muted text-body',
               )}
             >
               {comment.body}

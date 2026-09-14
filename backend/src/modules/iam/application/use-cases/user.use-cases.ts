@@ -389,6 +389,15 @@ export class UpdateUser {
     }
 
     if (input.name !== undefined) {
+      // Name (and, on the self-service endpoint, the photo) is identity data, not an
+      // organizational decision — even USER_UPDATE does not let one account rename
+      // another. Renaming yourself belongs to `UpdateOwnProfile`, not here.
+      if (!user.uuid.equals(actor.userUuid)) {
+        throw DomainError.forbidden(
+          'CANNOT_CHANGE_OTHERS_NAME',
+          'Nome só pode ser alterado pelo próprio usuário, em Meu perfil.',
+        );
+      }
       user.rename(input.name);
       if (await this.users.existsByName(user.name, uuid)) {
         throw DomainError.conflict('USER_ALREADY_EXISTS', 'Já existe um usuário com esse nome.');

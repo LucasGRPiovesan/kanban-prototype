@@ -110,7 +110,9 @@
     --enhancement-bg-2: 52 74 20;
     --enhancement-fg: 198 239 94;
     --enhancement-ring: 183 233 58;
-    --chart-arrivals: 37 99 235;
+    /* Neutral vs. brand green, not a rainbow: arrivals are plain input, deliveries are
+       the thing the brand colour already means everywhere else in the app. */
+    --chart-arrivals: 130 140 126;
     --chart-deliveries: 101 138 18;
     /* Assistant ("Ação rápida"): deep olive face, lime ink, a lime comet on the rim. */
     --assistant-bg: 30 43 12;
@@ -200,7 +202,7 @@
       --enhancement-bg-2: 163 217 28;
       --enhancement-fg: 20 28 8;
       --enhancement-ring: 217 245 153;
-      --chart-arrivals: 59 130 246;
+      --chart-arrivals: 148 158 143;
       --chart-deliveries: 118 163 18;
       --assistant-bg: 40 56 18;
       --assistant-bg-2: 24 33 12;
@@ -273,7 +275,7 @@
     --enhancement-bg-2: 163 217 28;
     --enhancement-fg: 20 28 8;
     --enhancement-ring: 217 245 153;
-    --chart-arrivals: 59 130 246;
+    --chart-arrivals: 148 158 143;
     --chart-deliveries: 118 163 18;
     --assistant-bg: 40 56 18;
     --assistant-bg-2: 24 33 12;

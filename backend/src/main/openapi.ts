@@ -441,6 +441,8 @@ export const openApiDocument = {
       patch: {
         tags: ['Users'],
         summary: 'Atualiza usuário (requer USER_UPDATE)',
+        description:
+          'Aceita `roleUuid` e `active` — as decisões organizacionais sobre a conta. Não aceita `name`: mesmo com USER_UPDATE, ninguém renomeia outra pessoa por aqui (403 CANNOT_CHANGE_OTHERS_NAME) — nome e foto só mudam pela própria pessoa, em PATCH /users/me.',
         parameters: [uuidPath],
         responses: { 200: { description: 'OK' }, ...commonResponses },
       },

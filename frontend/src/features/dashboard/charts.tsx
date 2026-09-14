@@ -2,7 +2,7 @@ import { Avatar } from '@/components/ui/Avatar';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { STATUS_PRESENTATION } from '@/features/demands/status';
 import { cn } from '@/lib/cn';
-import type { Dashboard } from '@/lib/api/types';
+import type { Dashboard, DemandStatus } from '@/lib/api/types';
 import { formatShortDate, plural } from './dashboardFormat';
 
 /*
@@ -82,9 +82,21 @@ export function ProportionBar({ segments, label }: { segments: Segment[]; label:
 }
 
 /**
- * Demands per status, in board order. Each bar wears its column's colour — the same
- * identity the Kanban uses — and each row is named, so the colour is never the label.
+ * One tone per step of the workflow, from neutral (nothing started yet) to the brand's
+ * darkest lime (in production) — a progression, not the Kanban's five unrelated hues.
+ * The dashboard is a report about the system, not another rendering of the board, so it
+ * reads in the report's own palette; each row is still named, so the colour is never
+ * the only way to tell two bars apart.
  */
+const STATUS_TONE: Record<DemandStatus, string> = {
+  NOT_STARTED: 'bg-line-strong',
+  IN_PROGRESS: 'bg-brand-300',
+  PAUSED: 'bg-brand-500',
+  IN_REVIEW: 'bg-brand-700',
+  PRODUCTION: 'bg-brand-900',
+};
+
+/** Demands per status, in board order. Each row is named, so the colour is never the label. */
 export function StatusBars({ distribution }: { distribution: Dashboard['statusDistribution'] }) {
   const max = Math.max(1, ...distribution.map((entry) => entry.count));
   const total = distribution.reduce((sum, entry) => sum + entry.count, 0);
@@ -93,6 +105,7 @@ export function StatusBars({ distribution }: { distribution: Dashboard['statusDi
     <ul className="space-y-2.5">
       {distribution.map(({ status, count }) => {
         const presentation = STATUS_PRESENTATION[status];
+        const tone = STATUS_TONE[status];
         const text = `${presentation.label}: ${count} ${plural(count, 'demanda', 'demandas')}`;
         return (
           <li
@@ -100,7 +113,7 @@ export function StatusBars({ distribution }: { distribution: Dashboard['statusDi
             className="grid grid-cols-[minmax(0,8.5rem)_minmax(0,1fr)_4.5rem] items-center gap-3"
           >
             <span className="flex min-w-0 items-center gap-2 text-sm text-muted">
-              <span className={cn('h-2 w-2 shrink-0 rounded-full', presentation.dotClass)} aria-hidden="true" />
+              <span className={cn('h-2 w-2 shrink-0 rounded-full', tone)} aria-hidden="true" />
               <span className="truncate">{presentation.label}</span>
             </span>
             <Tooltip label={text} className="flex h-6 w-full items-center border-l border-line-strong">
@@ -109,7 +122,7 @@ export function StatusBars({ distribution }: { distribution: Dashboard['statusDi
                 aria-label={text}
                 className={cn(
                   'block h-2.5 rounded-r-[4px] outline-none focus-visible:ring-2 focus-visible:ring-brand-500',
-                  presentation.dotClass,
+                  tone,
                 )}
                 style={{ width: count > 0 ? `max(4px, ${(count / max) * 100}%)` : 0 }}
               />

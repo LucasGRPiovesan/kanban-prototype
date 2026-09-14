@@ -178,6 +178,21 @@ describe('Authentication', () => {
     expect(sameRole.status).toBe(200);
   });
 
+  it('refuses to rename another user, even with USER_UPDATE — only the person themself can, via /users/me', async () => {
+    const response = await request(app)
+      .patch(`/api/v1/users/${SEED_UUIDS.users.marianaAlves}`)
+      .set('Cookie', AS.admin())
+      .send({ name: 'Mariana Renomeada' });
+    expect(response.status).toBe(403);
+    expect(response.body.error.code).toBe('CANNOT_CHANGE_OTHERS_NAME');
+
+    const untouched = await prisma.user.findUniqueOrThrow({
+      where: { uuid: SEED_UUIDS.users.marianaAlves },
+      select: { name: true },
+    });
+    expect(untouched.name).not.toBe('Mariana Renomeada');
+  });
+
   it('never authenticates an excluded account, and refuses to reactivate one directly', async () => {
     const user = await prisma.user.findUniqueOrThrow({
       where: { uuid: SEED_UUIDS.users.andreCarvalho },

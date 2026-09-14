@@ -1,26 +1,17 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Lock, Plus, ShieldCheck, SlidersHorizontal } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { Lock, Plus, SlidersHorizontal } from 'lucide-react';
 import { PermissionGate } from '@/app/router/guards';
-import { Button, buttonClasses } from '@/components/ui/Button';
+import { buttonClasses } from '@/components/ui/Button';
 import { ErrorState, Skeleton } from '@/components/ui/Feedback';
-import { Field, Input } from '@/components/ui/Field';
-import { Modal } from '@/components/ui/Modal';
 import { EnhancementBadge } from '@/components/ui/EnhancementBadge';
 import { PageHeader, PageShell } from '@/components/ui/PageHeader';
-import { useToast } from '@/components/ui/Toast';
-import { ApiError } from '@/lib/api/client';
 import { rolesApi } from '@/lib/api/endpoints';
-import { cn } from '@/lib/cn';
-import type { PermissionCode, PermissionModuleGroup } from '@/lib/api/types';
-import { isModuleEnabled, moduleLabel, togglePermission } from './permissionPolicy';
+import type { PermissionCode } from '@/lib/api/types';
+import { moduleLabel } from './permissionPolicy';
 
 export function RolesPage() {
-  const { notify } = useToast();
-  const queryClient = useQueryClient();
-  const [creating, setCreating] = useState(false);
-
   const rolesQuery = useQuery({ queryKey: ['roles'], queryFn: rolesApi.list });
   const catalogQuery = useQuery({
     queryKey: ['roles', 'catalog'],
@@ -61,9 +52,10 @@ export function RolesPage() {
           crumbs={[{ label: 'Home', to: '/' }, { label: 'Perfis' }]}
           actions={
             <PermissionGate permission="ROLE_CREATE">
-              <Button icon={<Plus className="h-4 w-4" />} onClick={() => setCreating(true)}>
+              <Link to="/perfis/novo" className={buttonClasses('primary', 'md', 'gap-2')}>
+                <Plus className="h-4 w-4" aria-hidden="true" />
                 Novo perfil
-              </Button>
+              </Link>
             </PermissionGate>
           }
         />
@@ -142,161 +134,6 @@ export function RolesPage() {
           ))}
         </ul>
       </div>
-
-      {creating && catalogQuery.data && (
-        <CreateRoleModal
-          groups={catalogQuery.data}
-          onClose={() => setCreating(false)}
-          onCreated={() => {
-            void queryClient.invalidateQueries({ queryKey: ['roles'] });
-            notify('Perfil criado.', 'success');
-            setCreating(false);
-          }}
-          onError={(message) => notify(message, 'error')}
-        />
-      )}
     </PageShell>
-  );
-}
-
-/**
- * Creation stays a dialog while editing does not, and the difference is not cosmetic:
- * a profile that does not exist yet has nothing to save changes *to*. The name and the
- * initial permission set have to arrive together, in one request, so this is a genuine
- * form with a submit — unlike the editor, where every toggle stands on its own.
- */
-function CreateRoleModal({
-  groups,
-  onClose,
-  onCreated,
-  onError,
-}: {
-  groups: PermissionModuleGroup[];
-  onClose: () => void;
-  onCreated: () => void;
-  onError: (message: string) => void;
-}) {
-  const [name, setName] = useState('');
-  const [selected, setSelected] = useState<PermissionCode[]>([]);
-  const [nameError, setNameError] = useState<string | undefined>();
-
-  const mutation = useMutation({
-    mutationFn: () => rolesApi.create({ name: name.trim(), permissions: selected }),
-    onSuccess: onCreated,
-    onError: (error) => {
-      if (error instanceof ApiError) {
-        if (error.code === 'ROLE_ALREADY_EXISTS' || error.code === 'INVALID_ROLE_NAME') {
-          setNameError(error.message);
-        }
-        onError(error.message);
-        return;
-      }
-      onError('Não foi possível criar o perfil.');
-    },
-  });
-
-  const handleSubmit = () => {
-    if (name.trim().length < 3) {
-      setNameError('Informe um nome com pelo menos 3 caracteres.');
-      return;
-    }
-    setNameError(undefined);
-    mutation.mutate();
-  };
-
-  return (
-    <Modal
-      open
-      onClose={onClose}
-      size="lg"
-      title="Novo perfil"
-      description="Defina o nome e as permissões iniciais. Tudo pode ser ajustado depois."
-      footer={
-        <>
-          <Button variant="secondary" onClick={onClose} disabled={mutation.isPending}>
-            Cancelar
-          </Button>
-          <Button onClick={handleSubmit} loading={mutation.isPending}>
-            Criar perfil
-          </Button>
-        </>
-      }
-    >
-      <div className="space-y-5">
-        <Field label="Nome do perfil" required error={nameError}>
-          {({ id, describedBy, invalid }) => (
-            <Input
-              id={id}
-              aria-describedby={describedBy}
-              invalid={invalid}
-              value={name}
-              placeholder="Ex.: Analista de Qualidade"
-              onChange={(event) => setName(event.target.value)}
-            />
-          )}
-        </Field>
-
-        <div className="space-y-4">
-          {groups.map((group) => {
-            const enabled = isModuleEnabled(group, selected);
-            return (
-              <fieldset key={group.module} className="rounded-xl border border-line p-3.5">
-                <legend className="px-1 text-sm font-bold text-body">
-                  {moduleLabel(group.module)}
-                </legend>
-
-                <div className="space-y-2 pt-1">
-                  {group.permissions.map((permission) => {
-                    const isAccess = permission.code === group.accessCode;
-                    const disabled = !isAccess && !enabled;
-                    const checked = selected.includes(permission.code);
-
-                    return (
-                      <label
-                        key={permission.code}
-                        className={cn(
-                          'flex items-start gap-2.5 rounded-lg px-2 py-1.5 transition-colors',
-                          disabled
-                            ? 'cursor-not-allowed opacity-45'
-                            : 'cursor-pointer hover:bg-surface-muted',
-                          isAccess && 'font-semibold',
-                        )}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          disabled={disabled}
-                          onChange={(event) =>
-                            setSelected((current) =>
-                              togglePermission(
-                                groups,
-                                current,
-                                permission.code,
-                                event.target.checked,
-                              ),
-                            )
-                          }
-                          className="mt-0.5 h-4 w-4 shrink-0 rounded border-line-strong accent-brand-500"
-                        />
-                        <span className="min-w-0 flex-1">
-                          <span className="block text-sm text-body">{permission.description}</span>
-                          <span className="block text-2xs text-subtle">{permission.code}</span>
-                        </span>
-                        {isAccess && (
-                          <ShieldCheck
-                            className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-600"
-                            aria-label="Permissão principal do módulo"
-                          />
-                        )}
-                      </label>
-                    );
-                  })}
-                </div>
-              </fieldset>
-            );
-          })}
-        </div>
-      </div>
-    </Modal>
   );
 }

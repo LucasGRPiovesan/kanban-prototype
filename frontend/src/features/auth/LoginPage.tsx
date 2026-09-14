@@ -128,7 +128,8 @@ export function LoginPage() {
               <span className="text-sidebar-panel-accent">.</span>
             </h1>
             <p className="max-w-sm text-base leading-relaxed text-sidebar-text-muted">
-              Acompanhe as demandas dos seus projetos em um quadro que todo mundo lê da mesma forma.
+              Acompanhe as demandas dos seus projetos em um único quadro, sempre atualizado para
+              toda a equipe.
             </p>
           </div>
 

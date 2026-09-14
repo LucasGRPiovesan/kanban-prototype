@@ -1,13 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, History, ListChecks, Lock, RotateCcw, Trash2, UserRound } from 'lucide-react';
+import { ArrowLeft, History, ListChecks, Lock, RotateCcw, Trash2 } from 'lucide-react';
 import { useAuth } from '@/app/providers/AuthProvider';
 import { PermissionGate } from '@/app/router/guards';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button, buttonClasses } from '@/components/ui/Button';
 import { ErrorState, Skeleton } from '@/components/ui/Feedback';
-import { Input } from '@/components/ui/Field';
 import { Combobox } from '@/components/ui/Combobox';
 import { InlineEdit } from '@/components/ui/InlineEdit';
 import { PageHeader, PageShell } from '@/components/ui/PageHeader';
@@ -21,17 +20,18 @@ import { DeleteUserDialog } from './DeleteUserDialog';
 import { UserHistory } from './UserHistory';
 import { useDeleteUser, useRestoreUser, useUpdateUser, useUser } from './useUsers';
 
-type EditableField = 'name' | 'role';
+type EditableField = 'role';
 type ProfileTab = 'demands' | 'history';
 
 /**
- * A user's own screen — where "Editar" on the Usuários table leads.
+ * The account-management view of a user — where "Editar" on the Usuários table leads.
  *
- * Three things a person managing accounts actually wants together: who this is (and the
- * two things about them that can change, name and perfil), what they are carrying right
- * now (their demands), and how their account itself got to where it is (its own
- * activity). Splitting those across three screens would mean three round trips to answer
- * one question — "posso reatribuir o trabalho da Beatriz?" — that this page answers in one.
+ * Three things a person managing accounts actually wants together: who this is, what
+ * organizational decisions apply to them (perfil, situação — the only two fields this
+ * screen can change), what they are carrying right now (their demands), and how their
+ * account itself got to where it is (its own activity). Name and photo are deliberately
+ * absent from what can be edited here: those are the person's own identity data, changed
+ * only from their own "Meu perfil" screen, never by whoever manages the account.
  */
 export function UserProfilePage() {
   const { uuid = '' } = useParams();
@@ -63,18 +63,16 @@ export function UserProfilePage() {
   const [openDemand, setOpenDemand] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  const [nameDraft, setNameDraft] = useState('');
   const [roleDraft, setRoleDraft] = useState('');
   useEffect(() => {
-    setNameDraft(user?.name ?? '');
     setRoleDraft(user?.role.uuid ?? '');
-  }, [user?.name, user?.role.uuid, editing]);
+  }, [user?.role.uuid, editing]);
 
   const canEdit = can('USER_UPDATE');
   const isSelf = session?.user.uuid === uuid;
   const lockedReason = canEdit ? undefined : 'Você não tem permissão para gerenciar usuários';
 
-  const save = (input: { name?: string; roleUuid?: string }) => {
+  const save = (input: { roleUuid: string }) => {
     updateMutation.mutate(
       { uuid, input },
       {
@@ -218,31 +216,24 @@ export function UserProfilePage() {
 
           <div className="flex items-center gap-4">
             <Avatar name={user.name} src={user.avatarUrl} size="lg" />
-            <div className="min-w-0 flex-1">
-              <InlineEdit
-                label="Nome"
-                icon={<UserRound className="h-3.5 w-3.5" />}
-                canEdit={canEdit}
-                lockedReason={lockedReason}
-                editing={editing === 'name'}
-                saving={updateMutation.isPending}
-                onStartEditing={() => setEditing('name')}
-                onCancel={() => setEditing(null)}
-                onSave={() => save({ name: nameDraft.trim() })}
-                display={<p className="text-xl font-bold leading-snug text-body">{user.name}</p>}
-              >
-                <Input
-                  value={nameDraft}
-                  onChange={(event) => setNameDraft(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') {
-                      event.preventDefault();
-                      save({ name: nameDraft.trim() });
-                    }
-                  }}
-                  aria-label="Nome do usuário"
-                />
-              </InlineEdit>
+            <div className="min-w-0 flex-1 space-y-1">
+              <p className="text-xl font-bold leading-snug text-body">{user.name}</p>
+              {/*
+                Name and photo are base identity data, not something a manager assigns —
+                only the person themselves corrects them, from their own "Meu perfil"
+                screen. This page still owns the two things that ARE organizational
+                decisions about someone: perfil and situação, just below.
+              */}
+              {isSelf ? (
+                <Link to="/perfil" className="text-xs font-semibold text-brand-700 hover:underline">
+                  Alterar nome e foto em Meu perfil
+                </Link>
+              ) : (
+                <p className="flex items-center gap-1.5 text-xs text-subtle">
+                  <Lock className="h-3 w-3 shrink-0" aria-hidden="true" />
+                  Nome e foto só podem ser alterados pelo próprio usuário
+                </p>
+              )}
             </div>
           </div>
 

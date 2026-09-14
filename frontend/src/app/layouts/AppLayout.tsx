@@ -19,6 +19,7 @@ import {
   X,
 } from 'lucide-react';
 import { useAuth } from '@/app/providers/AuthProvider';
+import { BreadcrumbProvider, useBreadcrumbs } from '@/app/providers/BreadcrumbProvider';
 import { useTheme } from '@/app/providers/ThemeProvider';
 import logoBlack from '@/assets/brand/logo-black.png';
 import logoLight from '@/assets/brand/logo-light.png';
@@ -26,6 +27,7 @@ import { Avatar } from '@/components/ui/Avatar';
 import { FullPageLoader } from '@/components/ui/FullPageLoader';
 import { IconButton } from '@/components/ui/Button';
 import { EnhancementBadge } from '@/components/ui/EnhancementBadge';
+import { Breadcrumbs } from '@/components/ui/PageHeader';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { cn } from '@/lib/cn';
 import { NotificationBell } from '@/features/notifications/NotificationBell';
@@ -143,47 +145,49 @@ export function AppLayout() {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-canvas">
-      {mobileOpen && (
-        <div
-          className="fixed inset-0 z-30 animate-fade-in bg-black/50 backdrop-blur-[2px] lg:hidden"
-          onClick={() => setMobileOpen(false)}
-          aria-hidden="true"
-        />
-      )}
+    <BreadcrumbProvider>
+      <div className="flex h-screen overflow-hidden bg-canvas">
+        {mobileOpen && (
+          <div
+            className="fixed inset-0 z-30 animate-fade-in bg-black/50 backdrop-blur-[2px] lg:hidden"
+            onClick={() => setMobileOpen(false)}
+            aria-hidden="true"
+          />
+        )}
 
-      <Sidebar
-        items={visibleItems}
-        open={mobileOpen}
-        collapsed={collapsed}
-        onClose={() => setMobileOpen(false)}
-      />
-
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <Topbar
+        <Sidebar
+          items={visibleItems}
+          open={mobileOpen}
           collapsed={collapsed}
-          onToggleCollapse={() => setCollapsed((current) => !current)}
-          onOpenMobileMenu={() => setMobileOpen(true)}
-          userName={session?.user.name ?? ''}
-          userAvatarUrl={session?.user.avatarUrl ?? null}
-          roleName={session?.role.name ?? ''}
-          onLogout={handleLogout}
+          onClose={() => setMobileOpen(false)}
         />
-        {/*
-          Keying on the path replays the entrance animation on every navigation, so
-          moving between screens reads as a transition rather than an instant swap.
-        */}
-        <main
-          key={location.pathname}
-          className="scroll-slim min-h-0 w-full min-w-0 flex-1 animate-rise-in overflow-y-auto"
-        >
-          {/* Screens are lazy-loaded chunks (see AppRouter): the shell stays put while one loads. */}
-          <Suspense fallback={<FullPageLoader />}>
-            <Outlet />
-          </Suspense>
-        </main>
+
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+          <Topbar
+            collapsed={collapsed}
+            onToggleCollapse={() => setCollapsed((current) => !current)}
+            onOpenMobileMenu={() => setMobileOpen(true)}
+            userName={session?.user.name ?? ''}
+            userAvatarUrl={session?.user.avatarUrl ?? null}
+            roleName={session?.role.name ?? ''}
+            onLogout={handleLogout}
+          />
+          {/*
+            Keying on the path replays the entrance animation on every navigation, so
+            moving between screens reads as a transition rather than an instant swap.
+          */}
+          <main
+            key={location.pathname}
+            className="scroll-slim min-h-0 w-full min-w-0 flex-1 animate-rise-in overflow-y-auto"
+          >
+            {/* Screens are lazy-loaded chunks (see AppRouter): the shell stays put while one loads. */}
+            <Suspense fallback={<FullPageLoader />}>
+              <Outlet />
+            </Suspense>
+          </main>
+        </div>
       </div>
-    </div>
+    </BreadcrumbProvider>
   );
 }
 
@@ -347,6 +351,7 @@ function Topbar({
   onLogout: () => void;
 }) {
   const { resolved, toggle } = useTheme();
+  const { crumbs } = useBreadcrumbs();
 
   return (
     <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-line bg-surface/80 px-4 py-3 backdrop-blur-md sm:px-6">
@@ -365,6 +370,8 @@ function Topbar({
           onClick={onToggleCollapse}
         />
       </Tooltip>
+
+      <Breadcrumbs crumbs={crumbs} className="hidden min-w-0 lg:block" />
 
       <div className="min-w-0 flex-1" />
 

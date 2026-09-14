@@ -24,6 +24,7 @@ const DemandFormPage = page(() => import('@/features/demands/DemandFormPage'), '
 const DemandsListPage = page(() => import('@/features/demands/DemandsListPage'), 'DemandsListPage');
 const ProjectsPage = page(() => import('@/features/projects/ProjectsPage'), 'ProjectsPage');
 const RolesPage = page(() => import('@/features/roles/RolesPage'), 'RolesPage');
+const RoleFormPage = page(() => import('@/features/roles/RoleFormPage'), 'RoleFormPage');
 const RolePermissionsPage = page(() => import('@/features/roles/RolePermissionsPage'), 'RolePermissionsPage');
 const UserFormPage = page(() => import('@/features/users/UserFormPage'), 'UserFormPage');
 const UserProfilePage = page(() => import('@/features/users/UserProfilePage'), 'UserProfilePage');
@@ -144,6 +145,14 @@ export function AppRouter() {
           element={
             <ModuleAccessGuard permissions={['ROLE_ACCESS']}>
               <RolesPage />
+            </ModuleAccessGuard>
+          }
+        />
+        <Route
+          path="/perfis/novo"
+          element={
+            <ModuleAccessGuard permissions={['ROLE_ACCESS', 'ROLE_CREATE']}>
+              <RoleFormPage />
             </ModuleAccessGuard>
           }
         />
