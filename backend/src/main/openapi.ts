@@ -416,6 +416,27 @@ export const openApiDocument = {
         responses: { 200: { description: 'OK' }, ...commonResponses },
       },
     },
+    '/users/me/avatar': {
+      post: {
+        tags: ['Users'],
+        summary: 'Envia uma foto de perfil — sem permissão além de estar autenticado',
+        description:
+          'Multipart, campo `file`. JPEG, PNG ou WEBP; mesmo limite de tamanho dos anexos de demanda (`UPLOAD_MAX_FILE_SIZE_MB`, 4 MB na Vercel). Armazenada pela mesma `FileStoragePort` dos anexos (disco local ou Vercel Blob) e define `avatarUrl` para a URL resultante — equivalente a colar essa URL em `PATCH /users/me`.',
+        requestBody: {
+          required: true,
+          content: {
+            'multipart/form-data': {
+              schema: {
+                type: 'object',
+                required: ['file'],
+                properties: { file: { type: 'string', format: 'binary' } },
+              },
+            },
+          },
+        },
+        responses: { 200: { description: 'OK' }, ...commonResponses },
+      },
+    },
     '/users/{uuid}': {
       patch: {
         tags: ['Users'],

@@ -133,10 +133,11 @@ export class PrismaUserRepository implements UserRepository, UserQueries {
       this.prisma.user.findMany({
         where,
         include: { role: { select: { uuid: true, name: true, slug: true } } },
-        // Name, then uuid: two people can share a name, and pagination drifts between
-        // requests without a fully deterministic order — the same reasoning the demand
-        // and log listings follow.
-        orderBy: [{ name: 'asc' }, { uuid: 'asc' }],
+        // Most recent first, then uuid descending as the tiebreaker: two accounts can
+        // share a `createdAt` millisecond, and pagination drifts between requests
+        // without a fully deterministic order — the same reasoning the log listing
+        // follows for `(occurred_at, uuid)`.
+        orderBy: [{ createdAt: 'desc' }, { uuid: 'desc' }],
         skip: (page.page - 1) * page.limit,
         take: page.limit,
       }),

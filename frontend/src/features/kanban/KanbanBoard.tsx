@@ -51,7 +51,13 @@ export function KanbanBoard({
    * still does everything it always did.
    */
   canAddCard: boolean;
-  canMove: boolean;
+  /**
+   * Per-card, not a single board-wide switch: DEMAND_UPDATE alone says the profile may
+   * move cards in general, but whether it may move *this one* also depends on whether
+   * it belongs to them or the actor holds DEMAND_MANAGE_ALL — the same rule the server's
+   * `DemandAccessGuard.loadManageable` enforces regardless of what this returns.
+   */
+  canMove: (demand: Demand) => boolean;
   /**
    * DEMAND_MANAGE_PRODUCTION — the one exception to "produção is terminal". Without it,
    * dragging a card into Em produção asks for confirmation first, since the record locks
@@ -312,7 +318,7 @@ function Column({
   status: DemandStatus;
   index: number;
   demands: Demand[];
-  canMove: boolean;
+  canMove: (demand: Demand) => boolean;
   canAddHere: boolean;
   addCardHref: string;
   showProject: boolean;
@@ -405,10 +411,12 @@ function Column({
                   onOpen={onOpen}
                   showProject={showProject}
                   searchTerm={searchTerm}
-                  // Draggable regardless of status — including produção. Whether the drop
-                  // actually goes through depends on the permission, decided on drop.
-                  draggable={canMove}
-                  onMove={canMove ? (status) => onMove(demand.uuid, status) : undefined}
+                  // Draggable regardless of status — including produção — as long as
+                  // this specific card is the actor's to manage. Whether the drop
+                  // actually goes through also depends on the produção permission,
+                  // decided on drop.
+                  draggable={canMove(demand)}
+                  onMove={canMove(demand) ? (status) => onMove(demand.uuid, status) : undefined}
                 />
               </div>
             ))}

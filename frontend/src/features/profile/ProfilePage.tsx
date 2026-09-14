@@ -1,8 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ImageOff, ShieldCheck } from 'lucide-react';
+import { ImageOff, ShieldCheck, Upload } from 'lucide-react';
 import { z } from 'zod';
 import { useAuth } from '@/app/providers/AuthProvider';
 import { Avatar } from '@/components/ui/Avatar';
@@ -12,6 +12,9 @@ import { PageHeader, PageShell } from '@/components/ui/PageHeader';
 import { useToast } from '@/components/ui/Toast';
 import { ApiError } from '@/lib/api/client';
 import { usersApi } from '@/lib/api/endpoints';
+import { AvatarCropModal } from './AvatarCropModal';
+
+const AVATAR_ACCEPT = '.jpg,.jpeg,.png,.webp';
 
 /** Mirrors the domain rule in `User.assertName` — letters only, with or without accents. */
 const NAME_PATTERN = /^\p{L}+(?:[ '’-]\p{L}+)*$/u;
@@ -43,6 +46,8 @@ export function ProfilePage() {
   const { session } = useAuth();
   const { notify } = useToast();
   const queryClient = useQueryClient();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [pendingAvatarFile, setPendingAvatarFile] = useState<File | null>(null);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -62,6 +67,17 @@ export function ProfilePage() {
   const previewName = form.watch('name') || session?.user.name || '';
   const previewAvatar = form.watch('avatarUrl');
 
+  // The Topbar and every other reader of the session react immediately, without a
+  // round trip to /auth/me — the response already carries the new truth. Shared by
+  // both ways of changing the picture: a pasted URL and an uploaded, cropped file.
+  const applyUpdatedProfile = (updated: { name: string; avatarUrl: string | null }) => {
+    queryClient.setQueryData(['session'], (current: typeof session) =>
+      current
+        ? { ...current, user: { ...current.user, name: updated.name, avatarUrl: updated.avatarUrl } }
+        : current,
+    );
+  };
+
   const mutation = useMutation({
     mutationFn: (values: FormValues) =>
       usersApi.updateMe({
@@ -70,16 +86,7 @@ export function ProfilePage() {
         avatarUrl: values.avatarUrl,
       }),
     onSuccess: (updated) => {
-      // The Topbar and every other reader of the session react immediately, without a
-      // round trip to /auth/me — the response already carries the new truth.
-      queryClient.setQueryData(['session'], (current: typeof session) =>
-        current
-          ? {
-              ...current,
-              user: { ...current.user, name: updated.name, avatarUrl: updated.avatarUrl },
-            }
-          : current,
-      );
+      applyUpdatedProfile(updated);
       notify('Perfil atualizado.', 'success');
     },
     onError: (error) => {
@@ -99,6 +106,25 @@ export function ProfilePage() {
         return;
       }
       notify('Não foi possível salvar as alterações.', 'error');
+    },
+  });
+
+  const uploadMutation = useMutation({
+    mutationFn: (blob: Blob) => usersApi.uploadAvatar(blob),
+    onSuccess: (updated) => {
+      applyUpdatedProfile(updated);
+      // The URL field mirrors whatever the picture now is, the same way it would after
+      // pasting a link — "Remover" then works on an uploaded photo exactly as it does
+      // on one typed in.
+      form.setValue('avatarUrl', updated.avatarUrl ?? '', { shouldDirty: false });
+      setPendingAvatarFile(null);
+      notify('Foto de perfil atualizada.', 'success');
+    },
+    onError: (error) => {
+      notify(
+        error instanceof ApiError ? error.message : 'Não foi possível enviar a foto.',
+        'error',
+      );
     },
   });
 
@@ -155,29 +181,54 @@ export function ProfilePage() {
           <Field
             label="Foto de perfil"
             error={form.formState.errors.avatarUrl?.message}
-            hint="Link para uma imagem (http ou https). Deixe em branco para usar suas iniciais."
+            hint="Link para uma imagem (http ou https) ou envie um arquivo do seu computador. Deixe em branco para usar suas iniciais."
           >
             {({ id, describedBy, invalid }) => (
-              <div className="flex items-center gap-2">
-                <Input
-                  id={id}
-                  aria-describedby={describedBy}
-                  invalid={invalid}
-                  inputMode="url"
-                  placeholder="https://exemplo.com/foto.jpg"
-                  {...form.register('avatarUrl')}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Input
+                    id={id}
+                    aria-describedby={describedBy}
+                    invalid={invalid}
+                    inputMode="url"
+                    placeholder="https://exemplo.com/foto.jpg"
+                    {...form.register('avatarUrl')}
+                  />
+                  {previewAvatar && (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      icon={<ImageOff className="h-3.5 w-3.5" />}
+                      onClick={() => form.setValue('avatarUrl', '', { shouldDirty: true })}
+                    >
+                      Remover
+                    </Button>
+                  )}
+                </div>
+
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  icon={<Upload className="h-3.5 w-3.5" />}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  Enviar arquivo...
+                </Button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept={AVATAR_ACCEPT}
+                  className="sr-only"
+                  onChange={(event) => {
+                    const selected = event.target.files?.[0] ?? null;
+                    setPendingAvatarFile(selected);
+                    // Choosing the same file twice in a row still has to reopen the
+                    // cropper, so the input cannot remember the previous selection.
+                    event.target.value = '';
+                  }}
                 />
-                {previewAvatar && (
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    icon={<ImageOff className="h-3.5 w-3.5" />}
-                    onClick={() => form.setValue('avatarUrl', '', { shouldDirty: true })}
-                  >
-                    Remover
-                  </Button>
-                )}
               </div>
             )}
           </Field>
@@ -193,6 +244,13 @@ export function ProfilePage() {
           </div>
         </form>
       </div>
+
+      <AvatarCropModal
+        file={pendingAvatarFile}
+        loading={uploadMutation.isPending}
+        onCancel={() => setPendingAvatarFile(null)}
+        onConfirm={(blob) => uploadMutation.mutate(blob)}
+      />
     </PageShell>
   );
 }

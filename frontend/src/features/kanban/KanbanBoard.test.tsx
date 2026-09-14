@@ -37,7 +37,7 @@ function renderBoard(props: Partial<React.ComponentProps<typeof KanbanBoard>> = 
           demands={[]}
           loading={false}
           canAddCard
-          canMove
+          canMove={() => true}
           canManageProduction={false}
           showProject
           onOpen={() => undefined}
@@ -88,7 +88,7 @@ describe('KanbanBoard — per-column "+"', () => {
   });
 
   it('does not depend on canMove — a separate capability governs it entirely', () => {
-    renderBoard({ canMove: false });
+    renderBoard({ canMove: () => false });
     expect(
       screen.getByRole('link', { name: /adicionar demanda.*não iniciada/i }),
     ).toBeInTheDocument();

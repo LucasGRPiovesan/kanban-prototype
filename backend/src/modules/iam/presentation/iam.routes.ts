@@ -1,4 +1,6 @@
 import { type CookieOptions, Router } from 'express';
+import multer from 'multer';
+import { DomainError } from '../../../shared/domain/errors';
 import { asyncHandler } from '../../../shared/http/error-handler';
 import { currentActor, requirePermission } from '../../../shared/http/auth.middleware';
 import { created, noContent, ok } from '../../../shared/http/response';
@@ -26,6 +28,7 @@ import {
   type RestoreUser,
   type UpdateOwnProfile,
   type UpdateUser,
+  type UploadOwnAvatar,
 } from '../application/use-cases/user.use-cases';
 import {
   createRoleSchema,
@@ -52,6 +55,8 @@ export interface IamPresentationDeps {
   getUser: GetUser;
   getUserHistory: GetUserHistory;
   updateOwnProfile: UpdateOwnProfile;
+  uploadOwnAvatar: UploadOwnAvatar;
+  maxAvatarSizeBytes: number;
   createUser: CreateUser;
   updateUser: UpdateUser;
   deleteUser: DeleteUser;
@@ -162,6 +167,34 @@ export function createUsersRouter(deps: IamPresentationDeps): Router {
     asyncHandler(async (req, res) => {
       const body = updateOwnProfileSchema.parse(req.body);
       return ok(res, await deps.updateOwnProfile.execute(currentActor(req), body));
+    }),
+  );
+
+  /**
+   * Self-service upload — the file-picking twin of `PATCH /me`'s `avatarUrl`. Buffered
+   * in memory like a demand attachment: a profile picture is smaller still, and there
+   * is no thumbnail pipeline here to justify a temp file.
+   */
+  const avatarUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: deps.maxAvatarSizeBytes, files: 1 },
+  });
+
+  router.post(
+    '/me/avatar',
+    avatarUpload.single('file'),
+    asyncHandler(async (req, res) => {
+      const file = req.file;
+      if (!file) {
+        throw DomainError.validation('NO_FILE', 'Nenhum arquivo enviado.');
+      }
+      return ok(
+        res,
+        await deps.uploadOwnAvatar.execute(currentActor(req), {
+          mimeType: file.mimetype,
+          content: file.buffer,
+        }),
+      );
     }),
   );
 

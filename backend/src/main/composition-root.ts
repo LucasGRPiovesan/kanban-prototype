@@ -41,6 +41,7 @@ import {
   RestoreUser,
   UpdateOwnProfile,
   UpdateUser,
+  UploadOwnAvatar,
 } from '../modules/iam/application/use-cases/user.use-cases';
 import { type IamPresentationDeps } from '../modules/iam/presentation/iam.routes';
 
@@ -351,6 +352,8 @@ export function buildDependencies(
       getUser: new GetUser(userRepository),
       getUserHistory: new GetUserHistory(logQueries),
       updateOwnProfile: new UpdateOwnProfile(userRepository, userRepository, uow, activityRecorder),
+      uploadOwnAvatar: new UploadOwnAvatar(userRepository, userRepository, storage, uow, activityRecorder),
+      maxAvatarSizeBytes: env.uploadMaxFileSizeBytes,
       createUser: new CreateUser(userRepository, userRepository, uow, activityRecorder),
       updateUser: new UpdateUser(userRepository, userRepository, uow, activityRecorder),
       deleteUser: new DeleteUser(

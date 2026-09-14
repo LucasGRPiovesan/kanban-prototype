@@ -78,6 +78,12 @@ export const usersApi = {
    */
   updateMe: (input: { name?: string; avatarUrl?: string | null }) =>
     api.patch<User>('/users/me', input),
+  /** The cropped picture a person picked from disk, as opposed to a pasted URL. */
+  uploadAvatar: (file: Blob) => {
+    const form = new FormData();
+    form.append('file', file, 'avatar.png');
+    return api.upload<User>('/users/me/avatar', form);
+  },
   /** The profile screen's "Atualizações" section. */
   history: (uuid: string, page?: number) =>
     api.get<LogPage>(`/users/${uuid}/history${toQuery({ page })}`),

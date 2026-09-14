@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   Archive,
-  FolderKanban,
   Kanban as KanbanIcon,
   LayoutList,
   Plus,
@@ -14,7 +13,7 @@ import { useAuth } from '@/app/providers/AuthProvider';
 import { PermissionGate } from '@/app/router/guards';
 import { AvatarGroup } from '@/components/ui/Avatar';
 import { Button, buttonClasses } from '@/components/ui/Button';
-import { EmptyState, ErrorState } from '@/components/ui/Feedback';
+import { ErrorState } from '@/components/ui/Feedback';
 import { controlClasses } from '@/components/ui/Field';
 import { Combobox } from '@/components/ui/Combobox';
 import { useToast } from '@/components/ui/Toast';
@@ -95,7 +94,7 @@ function ViewTabs({ value, onChange }: { value: BoardView; onChange: (next: Boar
 
 export function KanbanPage() {
   const { notify } = useToast();
-  const { can } = useAuth();
+  const { can, session } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
 
   // The selected project and the open card live in the URL, so a board view can be
@@ -245,6 +244,21 @@ export function KanbanPage() {
   // With no project filter the board spans several projects at once, and a card has to
   // say which one it belongs to. Filtered to a single project, that label is noise.
   const showProject = !projectUuid;
+
+  /*
+   * DEMAND_UPDATE alone says the profile may manage demands in general — whether it may
+   * manage *this one* also needs DEMAND_MANAGE_ALL, or being its responsible or its
+   * creator, the same rule the server's DemandAccessGuard.loadManageable enforces
+   * regardless. Per-card, not a single board-wide switch: seeing a shared board (
+   * DEMAND_VIEW_ALL) is not the same as being trusted to move every card on it.
+   */
+  const canManageAllDemands = can('DEMAND_MANAGE_ALL');
+  const canManageDemand = (demand: { responsible: { uuid: string }; createdBy: { uuid: string } }) =>
+    !archivedView &&
+    can('DEMAND_UPDATE') &&
+    (canManageAllDemands ||
+      demand.responsible.uuid === session?.user.uuid ||
+      demand.createdBy.uuid === session?.user.uuid);
 
   return (
     // The page claims the full height the shell gives it and hands the surplus to the
@@ -404,30 +418,25 @@ export function KanbanPage() {
           />
         )}
 
-        {!boardLoading && !demandsQuery.isError && !hasProjects && (
-          <div className="card-surface">
-            <EmptyState
-              icon={<FolderKanban className="h-6 w-6" />}
-              title="Você ainda não participa de nenhum projeto"
-              description="Peça a um administrador para alocar você em um projeto. As demandas aparecem aqui assim que isso acontecer."
-            />
-          </div>
-        )}
-
         {/*
-          Distinct from `filtered.length === 0`: a search, priority or responsible filter
-          narrowing an otherwise non-empty board to nothing is not the same situation as
-          the board having no demands at all. The former still has real columns to show —
-          each already reads "Nenhuma demanda aqui" on its own — and swapping the whole
-          board for a "cadastre a primeira demanda" prompt would be telling the wrong
-          story, and briefly hide the very columns a person could use to clear the filter.
+          Not participating in any project used to swap the whole board for a blocking
+          "sem projeto" message — wrong, since a project is not required for a demand to
+          exist. Someone with zero allocations but a project-less demand of their own
+          (created or assigned) still has real work to see, and even with none at all the
+          right answer is the ordinary empty board — five columns, each already reading
+          "Nenhuma demanda aqui" on its own — not a takeover screen that hides the very
+          structure the specification describes.
 
-          While `boardLoading` is true, whether there even are any projects is still
-          unknown — the board/list's own skeleton renders regardless of `hasProjects`, so
-          the loading window never has to guess which empty state it might be heading for.
+          `BoardEmptyState`'s single takeover stays reserved for the one case it was
+          built for: real project access with genuinely zero demands anywhere, where
+          "cadastre a primeira demanda" is the honest next step. Distinct, too, from
+          `filtered.length === 0`: a search, priority or responsible filter narrowing an
+          otherwise non-empty board to nothing is not the same situation, and swapping
+          the columns for a takeover there would briefly hide the way back to clearing
+          the filter.
         */}
-        {!demandsQuery.isError && (boardLoading || hasProjects) && (
-          !boardLoading && (demandsQuery.data ?? []).length === 0 ? (
+        {!demandsQuery.isError && (
+          !boardLoading && hasProjects && (demandsQuery.data ?? []).length === 0 ? (
             <BoardEmptyState
               title={archivedView ? 'Nenhuma demanda arquivada' : undefined}
               description={archivedView ? 'Demandas arquivadas aparecem aqui.' : undefined}
@@ -446,7 +455,7 @@ export function KanbanPage() {
                 demands={filtered}
                 loading={boardLoading}
                 canAddCard={!archivedView && can('DEMAND_CREATE') && can('DEMAND_CREATE_WITH_STATUS')}
-                canMove={!archivedView && can('DEMAND_UPDATE')}
+                canMove={canManageDemand}
                 canManageProduction={can('DEMAND_MANAGE_PRODUCTION')}
                 showProject={showProject}
                 searchTerm={search}

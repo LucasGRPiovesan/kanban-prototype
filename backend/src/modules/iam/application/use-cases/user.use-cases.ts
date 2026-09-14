@@ -128,6 +128,75 @@ function userSubject(view: UserWithRoleView) {
   return { type: 'USER' as const, uuid: view.userUuid, label: view.name };
 }
 
+/** Extensions accepted for an avatar — a narrower allowlist than demand attachments: a
+ *  profile picture is always an image, never a document. */
+const AVATAR_EXTENSION_BY_MIME: Record<string, string> = {
+  'image/jpeg': '.jpg',
+  'image/png': '.png',
+  'image/webp': '.webp',
+};
+
+/**
+ * Self-service, the upload twin of `UpdateOwnProfile`'s `avatarUrl` field.
+ *
+ * A separate use case rather than a branch inside `UpdateOwnProfile`: that one takes a
+ * URL a person typed in, this one takes bytes a person picked from disk — different
+ * inputs, different validation, and this is the one that owns a storage key nothing
+ * else in the request body does. Both end the same way, one call to `User.changeAvatar`
+ * with whatever URL the picture now lives at.
+ */
+export class UploadOwnAvatar {
+  constructor(
+    private readonly users: UserRepository,
+    private readonly queries: UserQueries,
+    private readonly storage: FileStoragePort,
+    private readonly uow: UnitOfWork,
+    private readonly activity: ActivityRecorder,
+  ) {}
+
+  async execute(actor: Actor, file: { mimeType: string; content: Buffer }): Promise<UserDTO> {
+    const user = await this.users.findByUuid(actor.userUuid);
+    const before = await this.queries.findWithRole(actor.userUuid);
+    if (!user || !before) {
+      throw DomainError.notFound('USER_NOT_FOUND', 'Usuário não encontrado.');
+    }
+
+    const extension = AVATAR_EXTENSION_BY_MIME[file.mimeType];
+    if (!extension) {
+      throw DomainError.validation('INVALID_AVATAR_FILE', 'Envie uma imagem JPEG, PNG ou WEBP.');
+    }
+
+    // Opaque and unguessable, the same reasoning demand attachments follow: never the
+    // original filename, and unique per upload so replacing a picture cannot collide
+    // with — or be confused for — the one it replaces.
+    const storageKey = `avatars/${user.uuid.toString()}/${Uuid.generate().toString()}${extension}`;
+    const stored = await this.storage.upload({
+      storageKey,
+      contentType: file.mimeType,
+      content: file.content,
+    });
+    user.changeAvatar(this.storage.resolveUrl(stored.storageKey));
+
+    const after = await this.uow.run(async () => {
+      await this.users.update(user);
+      const persisted = await this.queries.findWithRole(actor.userUuid);
+      if (!persisted) {
+        throw DomainError.notFound('USER_NOT_FOUND', 'Usuário não encontrado.');
+      }
+      // Same reasoning as UpdateOwnProfile: the URL itself is not something a reader
+      // benefits from seeing before/after, only that the picture changed.
+      await this.activity.record(logActorOf(actor), {
+        action: 'user.updated',
+        subject: userSubject(persisted),
+        changes: [{ field: 'avatarUrl', from: null, to: null }],
+      });
+      return persisted;
+    });
+
+    return toDTO(after);
+  }
+}
+
 export class ListUsers {
   constructor(private readonly queries: UserQueries) {}
 
