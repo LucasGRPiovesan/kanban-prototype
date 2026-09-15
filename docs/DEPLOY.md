@@ -410,7 +410,7 @@ um período sem conexões de cliente** — comportamento documentado do free tie
 serviço Aiven, não uma falha desta aplicação. Quando isso acontece, toda chamada à API
 volta `500 INTERNAL_ERROR` com `Can't reach database server` no log.
 
-Para evitar isso, `.github/workflows/db-keepalive.yml` roda a cada 3 horas e faz uma
+Para evitar isso, `.github/workflows/db-keepalive.yml` roda a cada hora e faz uma
 chamada real a `GET /api/v1/auth/candidates` — o mesmo endpoint público que a tela de
 login já usa, sem precisar de nenhum segredo novo. Isso mantém uma consulta genuína
 fluindo para o banco, não apenas um ping que prova que o processo da API está de pé. Se

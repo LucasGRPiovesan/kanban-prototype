@@ -15,10 +15,11 @@ name: Database keep-alive
 
 on:
   schedule:
-    # Every 3 hours, comfortably inside whatever Aiven's idle window turns out to
-    # be — GitHub Actions cron fires on a best-effort schedule (a few minutes of
-    # drift is normal and fine here).
-    - cron: '0 */3 * * *'
+    # Every hour. Aiven does not publish the exact idle threshold that trips the
+    # free tier's auto-power-off, so this stays well inside any plausible window
+    # rather than cutting it close — GitHub Actions cron fires on a best-effort
+    # schedule (a few minutes of drift is normal and fine here).
+    - cron: '0 * * * *'
   workflow_dispatch: {}
 
 jobs:
