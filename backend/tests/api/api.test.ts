@@ -179,18 +179,21 @@ describe('Authentication', () => {
   });
 
   it('refuses to rename another user, even with USER_UPDATE — only the person themself can, via /users/me', async () => {
+    // AS.admin() is Mariana's own session (see the login() calls above); the target here
+    // must be someone else, or this would exercise the self-rename path instead of the
+    // cross-user one this test is named for.
     const response = await request(app)
-      .patch(`/api/v1/users/${SEED_UUIDS.users.marianaAlves}`)
+      .patch(`/api/v1/users/${SEED_UUIDS.users.lucasBarbosa}`)
       .set('Cookie', AS.admin())
-      .send({ name: 'Mariana Renomeada' });
+      .send({ name: 'Lucas Renomeado' });
     expect(response.status).toBe(403);
     expect(response.body.error.code).toBe('CANNOT_CHANGE_OTHERS_NAME');
 
     const untouched = await prisma.user.findUniqueOrThrow({
-      where: { uuid: SEED_UUIDS.users.marianaAlves },
+      where: { uuid: SEED_UUIDS.users.lucasBarbosa },
       select: { name: true },
     });
-    expect(untouched.name).not.toBe('Mariana Renomeada');
+    expect(untouched.name).not.toBe('Lucas Renomeado');
   });
 
   it('never authenticates an excluded account, and refuses to reactivate one directly', async () => {

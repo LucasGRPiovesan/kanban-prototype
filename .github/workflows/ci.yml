@@ -58,7 +58,6 @@ jobs:
       # so it lives here in plain sight rather than as a repo secret.
       JWT_SECRET: github-actions-ci-only-secret-never-used-outside-this-workflow
       APP_TIMEZONE: America/Sao_Paulo
-      API_DOCS_ENABLED: 'false'
     steps:
       - uses: actions/checkout@v4
 
