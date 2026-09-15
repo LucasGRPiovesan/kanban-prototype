@@ -3,6 +3,11 @@
 // build `Date` objects from local-time components (`new Date(y, m, d, h)`) produce the
 // same instant on every machine — a dev box already in Brasília time and a CI runner
 // defaulting to UTC would otherwise disagree on what "today" or "23:59" means.
+//
+// This file runs in Vitest's Node process, where `process` exists at runtime; it just
+// isn't declared, since this project's tsconfig deliberately omits Node's ambient types
+// for a browser app. Declaring only what's used here avoids pulling in @types/node.
+declare const process: { env: Record<string, string | undefined> };
 process.env.TZ = 'America/Sao_Paulo';
 
 import '@testing-library/jest-dom/vitest';
