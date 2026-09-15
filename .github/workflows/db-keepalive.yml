@@ -1,0 +1,37 @@
+name: Database keep-alive
+
+# The Aiven MySQL instance backing this deployment is on the free plan, which
+# auto-powers-off after a period with no client connections (documented Aiven
+# behaviour, not a bug). This workflow keeps a real, low-frequency query flowing
+# to the API so the free-tier idle timer never fires.
+#
+# Hits a public, unauthenticated, already-existing endpoint (the login screen's
+# own candidate list) — no secret to manage, no new backend code, and the query
+# it runs (`SELECT ... FROM users`) is a genuine round trip to the database, not
+# a ping that only proves the API process is alive.
+#
+# If the database is ever powered off manually (or the free tier is retired),
+# this job starts failing loudly in the Actions tab instead of silently no-op-ing.
+
+on:
+  schedule:
+    # Every 3 hours, comfortably inside whatever Aiven's idle window turns out to
+    # be — GitHub Actions cron fires on a best-effort schedule (a few minutes of
+    # drift is normal and fine here).
+    - cron: '0 */3 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Query the API's database-backed endpoint
+        run: |
+          status=$(curl -s -o /tmp/body.json -w '%{http_code}' \
+            'https://kanban-prototype-api.vercel.app/api/v1/auth/candidates')
+          echo "HTTP $status"
+          cat /tmp/body.json
+          if [ "$status" != "200" ]; then
+            echo "::error::Keep-alive request failed with HTTP $status — the database may be powered off or unreachable."
+            exit 1
+          fi

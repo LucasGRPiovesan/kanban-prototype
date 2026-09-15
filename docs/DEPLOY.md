@@ -403,6 +403,34 @@ docker compose run --rm migrate  # reaplicar migrations/seed manualmente
 
 ---
 
+## Manter o banco ativo (plano gratuito do Aiven)
+
+O MySQL do Aiven roda no plano `free-1-1gb`, que **se desliga automaticamente depois de
+um período sem conexões de cliente** — comportamento documentado do free tier de todo
+serviço Aiven, não uma falha desta aplicação. Quando isso acontece, toda chamada à API
+volta `500 INTERNAL_ERROR` com `Can't reach database server` no log.
+
+Para evitar isso, `.github/workflows/db-keepalive.yml` roda a cada 3 horas e faz uma
+chamada real a `GET /api/v1/auth/candidates` — o mesmo endpoint público que a tela de
+login já usa, sem precisar de nenhum segredo novo. Isso mantém uma consulta genuína
+fluindo para o banco, não apenas um ping que prova que o processo da API está de pé. Se
+o banco for desligado manualmente, ou o plano gratuito for descontinuado, o job passa a
+falhar de forma visível na aba *Actions* do repositório em vez de continuar em silêncio.
+
+Se o banco chegar a desligar mesmo assim:
+
+1. Console do Aiven → o serviço `mysql-*` → *Actions* → **Power on service** (ou
+   `avn service update <nome> --power-on` pela CLI).
+2. O estado passa por `REBUILDING` por alguns minutos antes de `RUNNING`. Nenhum dado é
+   perdido — os backups diários continuam intactos.
+
+Para eliminar esse risco por completo (custo à parte), migre o serviço para um plano
+pago (a partir do *Startup*/*Developer tier*) em Console do Aiven → o serviço →
+*Service plan usage* → **Upgrade plan**: nesses planos o serviço nunca é desligado por
+inatividade.
+
+---
+
 ## Solução de problemas
 
 | Sintoma | Causa provável | Correção |
@@ -420,3 +448,4 @@ docker compose run --rm migrate  # reaplicar migrations/seed manualmente
 | Chamadas `/api` devolvem HTML de login da Vercel | `API_ORIGIN` aponta para um deploy protegido (preview ou URL única) | Use o domínio de produção da API |
 | Preview da API não inicia | Variáveis de banco com escopo só Production (intencional) | Veja [Production × Preview](#production--preview) |
 | Assistente responde "não configurado" | Banco criado sem `SEED_ASSISTANT_API_KEY` | Cadastre a chave em *Ação rápida → Configurar* (Administrador) |
+| Tudo dá `500 INTERNAL_ERROR`, log mostra `Can't reach database server` | **Serviço Aiven em `POWEROFF`** — o plano gratuito se autodesliga após um período sem conexões (comportamento documentado do free tier, não uma falha) | Religue em Aiven Console → o serviço → *Actions* → *Power on service* (leva alguns minutos, passa por `REBUILDING`). Ver keep-alive abaixo para evitar que aconteça de novo |
