@@ -147,7 +147,11 @@ export function exportExecutiveReportPdf({ answer, scope, generatedByUser }: Exe
   doc.text(answer.title, MARGIN_X, (y += 9));
 
   const generated = new Date(answer.meta.generatedAt);
-  const dateLabel = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'long', timeStyle: 'short' }).format(generated);
+  const dateLabel = new Intl.DateTimeFormat('pt-BR', {
+    dateStyle: 'long',
+    timeStyle: 'short',
+    timeZone: 'America/Sao_Paulo',
+  }).format(generated);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9.5);
   doc.setTextColor(...MUTED);

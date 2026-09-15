@@ -10,6 +10,16 @@
 const ISO = /^(\d{4})-(\d{2})-(\d{2})$/;
 const BR = /^(\d{2})\/(\d{2})\/(\d{4})$/;
 
+// The system is Brazil-only: "today" for due-date math is Brasília's calendar day,
+// not the viewer's own machine/browser timezone.
+const TIME_ZONE = 'America/Sao_Paulo';
+const CALENDAR_DATE = new Intl.DateTimeFormat('en-CA', {
+  timeZone: TIME_ZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
 export function isoToBr(iso: string): string {
   const match = ISO.exec(iso);
   if (!match) {
@@ -68,7 +78,8 @@ export function describeDueDate(
   }
   const [, y, m, d] = match;
   const due = Date.UTC(Number(y), Number(m) - 1, Number(d));
-  const now = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
+  const [ny, nm, nd] = CALENDAR_DATE.format(today).split('-').map(Number);
+  const now = Date.UTC(ny!, nm! - 1, nd!);
   const days = Math.round((due - now) / 86_400_000);
 
   if (days < 0) {

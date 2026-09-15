@@ -116,7 +116,7 @@ export function UsersTable({ users }: { users: UserPageItem[] }) {
 
                 <td className="whitespace-nowrap px-4 py-2.5 align-middle text-xs text-muted">
                   <time dateTime={user.createdAt} title={formatDateTime(user.createdAt)}>
-                    {new Date(user.createdAt).toLocaleDateString('pt-BR')}
+                    {new Date(user.createdAt).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}
                   </time>
                 </td>
 

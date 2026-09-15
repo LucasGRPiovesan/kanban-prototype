@@ -655,7 +655,7 @@ function Provenance({ demand }: { demand: Demand }) {
       <span>
         Criada por <span className="font-semibold text-body">{demand.createdBy.name}</span> em{' '}
         <time dateTime={demand.createdAt} title={formatDateTime(demand.createdAt)}>
-          {new Date(demand.createdAt).toLocaleDateString('pt-BR')}
+          {new Date(demand.createdAt).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}
         </time>
       </span>
       <span>

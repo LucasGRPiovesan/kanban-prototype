@@ -233,7 +233,8 @@ export function UserProfilePage() {
           {user.deletedAt && (
             <div className="flex items-center gap-2 rounded-lg border border-danger-border bg-danger-surface px-3 py-2 text-xs font-medium text-danger">
               <Trash2 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-              Usuário excluído em {new Date(user.deletedAt).toLocaleDateString('pt-BR')}. Os dados
+              Usuário excluído em{' '}
+              {new Date(user.deletedAt).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}. Os dados
               continuam no sistema — use "Reverter exclusão" para restaurar o acesso a esta conta.
             </div>
           )}

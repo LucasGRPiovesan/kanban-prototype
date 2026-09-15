@@ -20,9 +20,11 @@ export function BackLink({ onBack, label = 'Menu' }: { onBack: () => void; label
 
 /** Where an answer came from, in a sentence: scope, time and how long the model took. */
 export function MetaLine({ meta }: { meta: AssistantMeta }) {
-  const time = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' }).format(
-    new Date(meta.generatedAt),
-  );
+  const time = new Intl.DateTimeFormat('pt-BR', {
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'America/Sao_Paulo',
+  }).format(new Date(meta.generatedAt));
   const seconds = (meta.latencyMs / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 });
   return (
     <p className="text-xs text-subtle">

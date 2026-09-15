@@ -110,6 +110,7 @@ const TODAY_FORMAT = new Intl.DateTimeFormat('pt-BR', {
   weekday: 'long',
   day: '2-digit',
   month: 'long',
+  timeZone: 'America/Sao_Paulo',
 });
 
 export function HomePage() {

@@ -1,5 +1,9 @@
+// The system is Brazil-only: every timestamp shown to a user is pinned to Brasília time,
+// regardless of the viewer's own machine/browser timezone setting.
+const TIME_ZONE = 'America/Sao_Paulo';
+
 const RELATIVE = new Intl.RelativeTimeFormat('pt-BR', { numeric: 'auto' });
-const TIME = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' });
+const TIME = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: TIME_ZONE });
 const DATE_TIME = new Intl.DateTimeFormat('pt-BR', {
   day: '2-digit',
   month: '2-digit',
@@ -7,9 +11,33 @@ const DATE_TIME = new Intl.DateTimeFormat('pt-BR', {
   hour: '2-digit',
   minute: '2-digit',
   second: '2-digit',
+  timeZone: TIME_ZONE,
 });
-const DAY_SAME_YEAR = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
-const DAY_OTHER_YEAR = new Intl.DateTimeFormat('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' });
+const DAY_SAME_YEAR = new Intl.DateTimeFormat('pt-BR', {
+  weekday: 'long',
+  day: 'numeric',
+  month: 'long',
+  timeZone: TIME_ZONE,
+});
+const DAY_OTHER_YEAR = new Intl.DateTimeFormat('pt-BR', {
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+  timeZone: TIME_ZONE,
+});
+const CALENDAR_DATE = new Intl.DateTimeFormat('en-CA', {
+  timeZone: TIME_ZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+const YEAR_IN_ZONE = new Intl.DateTimeFormat('en-US', { timeZone: TIME_ZONE, year: 'numeric' });
+const DAY_OTHER_YEAR_SHORT = new Intl.DateTimeFormat('pt-BR', {
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+  timeZone: TIME_ZONE,
+});
 
 const MINUTE = 60;
 const HOUR = 60 * MINUTE;
@@ -38,7 +66,7 @@ export function formatRelative(iso: string, now: Date = new Date()): string {
   if (abs < 7 * DAY) {
     return RELATIVE.format(Math.round(seconds / DAY), 'day');
   }
-  return date.toLocaleDateString('pt-BR');
+  return DAY_OTHER_YEAR_SHORT.format(date);
 }
 
 /** Full timestamp for tooltips: the precise moment behind a relative label. */
@@ -50,12 +78,9 @@ export function formatTime(iso: string): string {
   return TIME.format(new Date(iso));
 }
 
-/** Local calendar day, for grouping a timeline under day headings. */
+/** Brasília calendar day, for grouping a timeline under day headings. */
 export function dayKey(iso: string): string {
-  const date = new Date(iso);
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${date.getFullYear()}-${month}-${day}`;
+  return CALENDAR_DATE.format(new Date(iso));
 }
 
 export function dayLabel(iso: string, now: Date = new Date()): string {
@@ -63,13 +88,14 @@ export function dayLabel(iso: string, now: Date = new Date()): string {
   if (key === dayKey(now.toISOString())) {
     return 'Hoje';
   }
-  const yesterday = new Date(now);
-  yesterday.setDate(now.getDate() - 1);
+  const yesterday = new Date(now.getTime() - DAY * 1000);
   if (key === dayKey(yesterday.toISOString())) {
     return 'Ontem';
   }
   const date = new Date(iso);
   const label =
-    date.getFullYear() === now.getFullYear() ? DAY_SAME_YEAR.format(date) : DAY_OTHER_YEAR.format(date);
+    YEAR_IN_ZONE.format(date) === YEAR_IN_ZONE.format(now)
+      ? DAY_SAME_YEAR.format(date)
+      : DAY_OTHER_YEAR.format(date);
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
