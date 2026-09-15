@@ -1,0 +1,111 @@
+name: CI
+
+# Quality gate for the code that reaches `main` — never a deploy step.
+#
+# Deploy already happens the way it should for a Vercel-hosted app: Vercel's own GitHub
+# integration builds and publishes both projects (api/web) straight from `main`, with
+# a preview deployment per pull request for free. Reimplementing that here (checking out
+# the code again, calling the Vercel CLI, managing a VERCEL_TOKEN secret) would duplicate
+# what Vercel already does natively and better. What Vercel's integration does *not* do is
+# run the test suite — this workflow is that missing piece, so a broken build shows up as
+# a red check on the PR instead of only in the Vercel deploy log.
+#
+# Add this workflow as a required status check (Settings → Branches → Branch protection
+# rules) once you want it to actually block a merge, rather than just report.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# A new push to the same branch/PR cancels whatever CI run was still going for the
+# previous one — no point finishing a check for code that's already been superseded.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend — typecheck, lint, build, tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+    # A throwaway MySQL 8 for this run only — same engine as Aiven in production,
+    # torn down when the job ends. Never touches the real database.
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: kanban_ci
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -proot"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      NODE_ENV: test
+      DATABASE_URL: mysql://root:root@127.0.0.1:3306/kanban_ci?connection_limit=5
+      # Only ever used against the ephemeral container above — never a real credential,
+      # so it lives here in plain sight rather than as a repo secret.
+      JWT_SECRET: github-actions-ci-only-secret-never-used-outside-this-workflow
+      APP_TIMEZONE: America/Sao_Paulo
+      API_DOCS_ENABLED: 'false'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - run: npm ci
+      - run: npx prisma generate
+
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run build
+
+      - name: Apply migrations
+        run: npm run db:migrate:deploy
+      - name: Seed
+        run: npm run db:seed
+      - name: Test (domain, application, API end-to-end)
+        run: npm test
+
+  frontend:
+    name: Frontend — typecheck, lint, tests, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+
+      # Real Vite build, plus the check that once caught a silently-broken /api rewrite
+      # in vercel.json (see scripts/check-vercel-config.mjs) — cheap insurance before the
+      # same vercel.json reaches an actual deploy.
+      - run: npm run check:vercel
+      - run: npm run build
