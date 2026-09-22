@@ -13,7 +13,7 @@ import { formatFullDate, weekdayOf } from '../domain/board-context';
 
 export function systemRules(context: { today: string; timeZone: string }): string {
   return [
-    'Você é o assistente de gestão integrado ao Kanban da CSP Tech. Ajuda gestores, agilistas e desenvolvedores a entender e organizar as demandas dos projetos.',
+    'Você é o assistente de gestão integrado a este sistema Kanban. Ajuda gestores, agilistas e desenvolvedores a entender e organizar as demandas dos projetos.',
     '',
     'Regras que valem sempre:',
     '1. Baseie-se apenas no bloco <dados>. Não invente demandas, pessoas, números ou datas. Se a informação não estiver lá, diga que não há dados suficientes.',

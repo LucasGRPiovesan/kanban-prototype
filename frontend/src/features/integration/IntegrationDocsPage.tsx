@@ -1,9 +1,11 @@
-import { type ReactNode } from 'react';
+import { type ReactNode, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { AlertTriangle, ExternalLink, KeyRound, Plug, Shield } from 'lucide-react';
+import { useAuth } from '@/app/providers/AuthProvider';
 import { CodeBlock } from '@/components/ui/CodeBlock';
 import { EnhancementBadge } from '@/components/ui/EnhancementBadge';
 import { PageHeader, PageShell } from '@/components/ui/PageHeader';
+import { BrandingSettings } from '@/features/branding/BrandingSettings';
 import { cn } from '@/lib/cn';
 
 const API_BASE = 'http://localhost:3333/api/v1';
@@ -14,7 +16,7 @@ interface Section {
   render: () => ReactNode;
 }
 
-const SECTIONS: Section[] = [
+const BASE_SECTIONS: Section[] = [
   { id: 'visao-geral', label: 'Visão geral', render: VisaoGeral },
   { id: 'autenticacao', label: 'Autenticação', render: Autenticacao },
   { id: 'criar-demanda', label: 'Criar demanda', render: CriarDemanda },
@@ -22,6 +24,8 @@ const SECTIONS: Section[] = [
   { id: 'mover-status', label: 'Mover status', render: MoverStatus },
   { id: 'seguranca-erros', label: 'Segurança e erros', render: SegurancaErros },
 ];
+
+const BRANDING_SECTION: Section = { id: 'marca', label: 'Marca', render: () => <BrandingSettings /> };
 
 /**
  * The demand-integration API, documented the way a third party would actually read it.
@@ -34,7 +38,12 @@ const SECTIONS: Section[] = [
  * static key on every request.
  */
 export function IntegrationDocsPage() {
+  const { can } = useAuth();
   const [params, setParams] = useSearchParams();
+  const SECTIONS = useMemo(
+    () => (can('ASSISTANT_MANAGE') ? [...BASE_SECTIONS, BRANDING_SECTION] : BASE_SECTIONS),
+    [can],
+  );
   const activeId = params.get('secao') ?? SECTIONS[0]!.id;
   const active = SECTIONS.find((section) => section.id === activeId) ?? SECTIONS[0]!;
 

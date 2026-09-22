@@ -28,6 +28,7 @@ export type LogGroup =
   | 'ROLE'
   | 'SESSION'
   | 'ASSISTANT'
+  | 'BRANDING'
   | 'SECURITY'
   | 'APPLICATION';
 
@@ -109,6 +110,10 @@ export const LOG_ACTIONS = [
   { code: 'assistant.request_completed', category: 'SYSTEM', group: 'ASSISTANT', subjectType: null, level: 'INFO', label: 'Consulta ao assistente de IA', requiredPermission: null },
   { code: 'assistant.request_failed', category: 'SYSTEM', group: 'ASSISTANT', subjectType: null, level: 'WARNING', label: 'Falha no assistente de IA', requiredPermission: null },
 
+  // --- Branding ---------------------------------------------------------------------
+  { code: 'branding.logo_updated', category: 'ACTIVITY', group: 'BRANDING', subjectType: 'SETTING', level: 'INFO', label: 'Logo do sistema alterada', requiredPermission: 'ASSISTANT_MANAGE' },
+  { code: 'branding.logo_reset', category: 'ACTIVITY', group: 'BRANDING', subjectType: 'SETTING', level: 'INFO', label: 'Logo do sistema restaurada ao padrão', requiredPermission: 'ASSISTANT_MANAGE' },
+
   // --- System ---------------------------------------------------------------------
   { code: 'app.started', category: 'SYSTEM', group: 'APPLICATION', subjectType: null, level: 'INFO', label: 'Aplicação iniciada', requiredPermission: null },
   { code: 'security.permission_denied', category: 'SYSTEM', group: 'SECURITY', subjectType: null, level: 'WARNING', label: 'Acesso negado por permissão', requiredPermission: null },
@@ -130,6 +135,7 @@ export const LOG_GROUP_LABELS: Record<LogGroup, string> = {
   ROLE: 'Perfis',
   SESSION: 'Sessões',
   ASSISTANT: 'Assistente de IA',
+  BRANDING: 'Marca',
   SECURITY: 'Segurança',
   APPLICATION: 'Aplicação',
 };

@@ -7,6 +7,7 @@ import {
   FolderInput,
   FolderKanban,
   HardDrive,
+  Image,
   KeyRound,
   ListPlus,
   ListX,
@@ -119,6 +120,9 @@ const ACTION_VISUALS: Record<string, ActionVisual> = {
   'assistant.settings_updated': { icon: Settings2, tone: 'brand' },
   'assistant.request_completed': { icon: Sparkles, tone: 'neutral' },
   'assistant.request_failed': { icon: Sparkles, tone: 'warning' },
+
+  'branding.logo_updated': { icon: Image, tone: 'brand' },
+  'branding.logo_reset': { icon: Image, tone: 'neutral' },
 };
 
 export function actionVisual(entry: Pick<LogEntry, 'action' | 'level'>): ActionVisual {

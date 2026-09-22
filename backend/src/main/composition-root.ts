@@ -153,6 +153,16 @@ import { type LanguageModelProvider } from '../modules/assistant/application/por
 import { GeminiLanguageModels } from '../modules/assistant/infrastructure/gemini-language-model';
 import { PrismaAssistantSettingsRepository } from '../modules/assistant/infrastructure/prisma-assistant-settings.repository';
 import { type AssistantPresentationDeps } from '../modules/assistant/presentation/assistant.routes';
+import {
+  GetBrandingSettings,
+  ResetBrandingLogo,
+  UploadBrandingLogo,
+} from '../modules/branding/application/use-cases/branding.use-cases';
+import { PrismaBrandingSettingsRepository } from '../modules/branding/infrastructure/prisma-branding-settings.repository';
+import {
+  type BrandingManagementPresentationDeps,
+  type BrandingPublicPresentationDeps,
+} from '../modules/branding/presentation/branding.routes';
 import { PrismaDemandActivityQueries } from '../modules/logs/infrastructure/prisma-demand-activity.queries';
 import { type RateLimiter } from '../shared/application/rate-limiter.port';
 import {
@@ -168,6 +178,10 @@ export interface AppDependencies {
   logs: LogsPresentationDeps;
   dashboard: DashboardPresentationDeps;
   assistant: AssistantPresentationDeps;
+  branding: {
+    public: BrandingPublicPresentationDeps;
+    management: BrandingManagementPresentationDeps;
+  };
   notifications: NotificationsPresentationDeps;
   resolveActor: ResolveActor;
   tokens: JwtTokenService;
@@ -327,6 +341,9 @@ export function buildDependencies(
     overrides.languageModels ?? new GeminiLanguageModels(assistantCipher, { timeoutMs: 25_000 });
   const assistantRateLimiter =
     overrides.assistantRateLimiter ?? new SlidingWindowRateLimiter(20, 5 * 60_000);
+
+  // --- Branding ---
+  const brandingSettings = new PrismaBrandingSettingsRepository(database);
 
   return {
     resolveActor,
@@ -526,6 +543,15 @@ export function buildDependencies(
         systemLogger,
         timeZone: env.APP_TIMEZONE,
       }),
+    },
+
+    branding: {
+      public: { getSettings: new GetBrandingSettings(brandingSettings, storage) },
+      management: {
+        uploadLogo: new UploadBrandingLogo(brandingSettings, storage, images, uow, activityRecorder),
+        resetLogo: new ResetBrandingLogo(brandingSettings, storage, uow, activityRecorder),
+        maxLogoSizeBytes: env.uploadMaxFileSizeBytes,
+      },
     },
 
     logs: {

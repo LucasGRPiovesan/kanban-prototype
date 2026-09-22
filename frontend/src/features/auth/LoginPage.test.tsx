@@ -11,12 +11,16 @@ import type { LoginCandidate, Session } from '@/lib/api/types';
 
 const candidates = vi.fn();
 const me = vi.fn();
+const brandingGet = vi.fn();
 
 vi.mock('@/lib/api/endpoints', () => ({
   authApi: {
     me: (...args: unknown[]) => me(...args),
     candidates: (...args: unknown[]) => candidates(...args),
     login: vi.fn(),
+  },
+  brandingApi: {
+    get: (...args: unknown[]) => brandingGet(...args),
   },
 }));
 
@@ -38,11 +42,17 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-function renderPage() {
+function renderPage(
+  branding: { logoLightUrl: string | null; logoDarkUrl: string | null } = {
+    logoLightUrl: 'https://example.test/logo-light.png',
+    logoDarkUrl: null,
+  },
+) {
   // No cookie yet: `/auth/me` answers the way an anonymous visitor's browser gets
   // answered, so AuthProvider settles on `session: null` and the picker renders.
   me.mockRejectedValue(new ApiError(401, 'NOT_AUTHENTICATED', 'Não autenticado.'));
   candidates.mockResolvedValue([WITH_PHOTO, WITHOUT_PHOTO]);
+  brandingGet.mockResolvedValue({ ...branding, updatedAt: null, updatedBy: null });
 
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Infinity } },
@@ -82,8 +92,15 @@ describe('LoginPage — candidate picker', () => {
 
   it('shows the actual brand wordmark, not typeset text', async () => {
     renderPage();
-    const logo = await screen.findByAltText('CSP Tech');
+    const logo = await screen.findByAltText('Kanban');
     expect(logo.tagName).toBe('IMG');
+  });
+
+  it('falls back to the bundled generic mark when no custom logo was configured', async () => {
+    renderPage({ logoLightUrl: null, logoDarkUrl: null });
+    await screen.findByRole('radio', { name: /Beatriz Ramos/i });
+    expect(screen.queryByAltText('Kanban')).toBeNull();
+    expect(document.querySelector('svg[role="img"]')).not.toBeNull();
   });
 });
 

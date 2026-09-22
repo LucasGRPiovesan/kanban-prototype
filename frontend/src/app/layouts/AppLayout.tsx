@@ -21,9 +21,9 @@ import {
 import { useAuth } from '@/app/providers/AuthProvider';
 import { BreadcrumbProvider, useBreadcrumbs } from '@/app/providers/BreadcrumbProvider';
 import { useTheme } from '@/app/providers/ThemeProvider';
-import logoBlack from '@/assets/brand/logo-black.png';
-import logoLight from '@/assets/brand/logo-light.png';
 import { Avatar } from '@/components/ui/Avatar';
+import { DefaultBrandMark } from '@/components/brand/DefaultBrandMark';
+import { useBrandingQuery } from '@/features/branding/useBranding';
 import { FullPageLoader } from '@/components/ui/FullPageLoader';
 import { IconButton } from '@/components/ui/Button';
 import { EnhancementBadge } from '@/components/ui/EnhancementBadge';
@@ -476,11 +476,19 @@ export function BrandMark({
   className?: string;
 }) {
   const { resolved } = useTheme();
+  const { data: branding } = useBrandingQuery();
+  const customUrl = resolved === 'dark' ? branding?.logoDarkUrl : branding?.logoLightUrl;
+
+  if (customUrl) {
+    return (
+      <img
+        src={customUrl}
+        alt="Kanban"
+        className={cn(BRAND_MARK_SIZES[size], 'w-auto object-contain', className)}
+      />
+    );
+  }
   return (
-    <img
-      src={resolved === 'dark' ? logoBlack : logoLight}
-      alt="CSP Tech"
-      className={cn(BRAND_MARK_SIZES[size], 'w-auto object-contain', className)}
-    />
+    <DefaultBrandMark className={cn(BRAND_MARK_SIZES[size], 'w-auto text-body', className)} />
   );
 }

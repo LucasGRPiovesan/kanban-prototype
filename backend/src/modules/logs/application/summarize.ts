@@ -136,6 +136,11 @@ function sentence(record: ActivityRecord, label: string): string {
 
     case 'assistant.settings_updated':
       return `Alterou ${fieldList(record.changes)} do assistente de IA`;
+
+    case 'branding.logo_updated':
+      return 'Alterou a logo do sistema';
+    case 'branding.logo_reset':
+      return 'Restaurou a logo padrão do sistema';
   }
 }
 

@@ -140,7 +140,7 @@ export function exportExecutiveReportPdf({ answer, scope, generatedByUser }: Exe
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8.5);
   doc.setTextColor(...BRAND_700);
-  doc.text('CSP TECH · ASSISTENTE DE IA', MARGIN_X, (y += 10));
+  doc.text('KANBAN · ASSISTENTE DE IA', MARGIN_X, (y += 10));
 
   doc.setFontSize(20);
   doc.setTextColor(...TEXT);
@@ -280,7 +280,7 @@ export function exportExecutiveReportPdf({ answer, scope, generatedByUser }: Exe
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7.5);
     doc.setTextColor(...MUTED);
-    doc.text('CSP Tech · Kanban — relatório gerado por IA', MARGIN_X, PAGE_HEIGHT - 10);
+    doc.text('Kanban — relatório gerado por IA', MARGIN_X, PAGE_HEIGHT - 10);
     doc.text(`Página ${page} de ${pageCount}`, PAGE_WIDTH - MARGIN_X, PAGE_HEIGHT - 10, { align: 'right' });
   }
 

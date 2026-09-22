@@ -28,4 +28,9 @@ export interface FileStoragePort {
 export interface ImageProcessorPort {
   isSupported(mimeType: string): boolean;
   createThumbnail(content: Buffer): Promise<{ content: Buffer; contentType: string }>;
+  /**
+   * Re-encodes an uploaded logo losslessly and reports its pixel size, so the caller can
+   * reject anything too small to read crisply before it is ever stored.
+   */
+  validateLogo(content: Buffer): Promise<{ content: Buffer; contentType: string; width: number; height: number }>;
 }

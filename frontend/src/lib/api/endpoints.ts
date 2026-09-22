@@ -4,6 +4,7 @@ import type {
   AssistantAnswer,
   AssistantCommand,
   AssistantStatus,
+  BrandingStatus,
   Dashboard,
   DashboardPeriod,
   DashboardScope,
@@ -280,6 +281,19 @@ export const assistantApi = {
   updateSettings: (input: { enabled?: boolean; model?: string; apiKey?: string }) =>
     api.patch<AssistantStatus>('/assistant/settings', input),
   run: (command: AssistantCommand) => api.post<AssistantAnswer>('/assistant/commands', command),
+};
+
+export type LogoVariant = 'light' | 'dark';
+
+/** Public: no session required, since the login page renders the logo too. */
+export const brandingApi = {
+  get: () => api.get<BrandingStatus>('/branding'),
+  uploadLogo: (variant: LogoVariant, file: File) => {
+    const form = new FormData();
+    form.append('file', file, `logo-${variant}.png`);
+    return api.upload<BrandingStatus>(`/branding/logo/${variant}`, form);
+  },
+  resetLogo: (variant: LogoVariant) => api.delete<BrandingStatus>(`/branding/logo/${variant}`),
 };
 
 function toQuery(params: Record<string, string | number | boolean | undefined>): string {

@@ -383,6 +383,13 @@ export interface AssistantStatus {
   } | null;
 }
 
+export interface BrandingStatus {
+  logoLightUrl: string | null;
+  logoDarkUrl: string | null;
+  updatedAt: string | null;
+  updatedBy: { uuid: string; name: string } | null;
+}
+
 export interface AssistantCommand {
   /** Omitted for free text, which the server classifies first. */
   action?: AssistantAction;

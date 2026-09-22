@@ -920,6 +920,57 @@ export const openApiDocument = {
         },
       },
     },
+    '/branding': {
+      get: {
+        tags: ['Branding'],
+        summary: 'Logo atual do sistema — sem autenticação',
+        description:
+          'URLs do logo para tema claro e escuro, ou `null` quando nenhum foi enviado (a interface usa a marca genérica embutida). Público: a tela de login precisa dele antes de qualquer sessão existir.',
+        responses: { 200: { description: 'OK' } },
+      },
+    },
+    '/branding/logo/{variant}': {
+      post: {
+        tags: ['Branding'],
+        summary: 'Envia o logo de um dos temas (requer ASSISTANT_MANAGE)',
+        description:
+          'Multipart, campo `file`. Somente PNG, mínimo 64x64 pixels; reprocessado sem perda (mesma `FileStoragePort` dos anexos e do avatar) e substitui o logo anterior desse tema.',
+        parameters: [
+          {
+            name: 'variant',
+            in: 'path',
+            required: true,
+            schema: { type: 'string', enum: ['light', 'dark'] },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'multipart/form-data': {
+              schema: {
+                type: 'object',
+                required: ['file'],
+                properties: { file: { type: 'string', format: 'binary' } },
+              },
+            },
+          },
+        },
+        responses: { 200: { description: 'OK' }, ...commonResponses },
+      },
+      delete: {
+        tags: ['Branding'],
+        summary: 'Restaura o logo padrão de um dos temas (requer ASSISTANT_MANAGE)',
+        parameters: [
+          {
+            name: 'variant',
+            in: 'path',
+            required: true,
+            schema: { type: 'string', enum: ['light', 'dark'] },
+          },
+        ],
+        responses: { 200: { description: 'OK' }, ...commonResponses },
+      },
+    },
     '/logs': {
       get: {
         tags: ['Logs'],

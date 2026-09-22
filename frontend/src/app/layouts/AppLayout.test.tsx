@@ -17,6 +17,9 @@ vi.mock('@/lib/api/endpoints', () => ({
     unreadCount: async () => ({ unreadCount: 0 }),
     streamPath: '/notifications/stream',
   },
+  brandingApi: {
+    get: async () => ({ logoLightUrl: null, logoDarkUrl: null, updatedAt: null, updatedBy: null }),
+  },
 }));
 
 const SESSION: Session = {

@@ -26,6 +26,10 @@ import {
 import { createLogsRouter } from '../modules/logs/presentation/logs.routes';
 import { createDashboardRouter } from '../modules/dashboard/presentation/dashboard.routes';
 import { createAssistantRouter } from '../modules/assistant/presentation/assistant.routes';
+import {
+  createBrandingManagementRouter,
+  createPublicBrandingRouter,
+} from '../modules/branding/presentation/branding.routes';
 import { createIntegrationAuthRouter } from '../modules/projects/presentation/integration-auth.routes';
 import { createIntegrationDemandsRouter } from '../modules/demands/presentation/integration-demands.routes';
 import {
@@ -157,6 +161,9 @@ export function createApp(env: AppEnv, deps: AppDependencies): Express {
    * `authenticate` that only accepts a project's integration token. See
    * `docs/ADDED_REQUIREMENTS.md` for the full shape of this API.
    */
+  // Public: the login page shows the configured logo before anyone is signed in.
+  api.use('/branding', createPublicBrandingRouter(deps.branding.public));
+
   api.use('/integration', createIntegrationAuthRouter(deps.integration.auth));
   const integrationApi = express.Router();
   integrationApi.use(integrationAuth({ authenticate: deps.integration.authenticate }));
@@ -185,6 +192,7 @@ export function createApp(env: AppEnv, deps: AppDependencies): Express {
   authenticated.use('/logs', createLogsRouter(deps.logs));
   authenticated.use('/dashboard', createDashboardRouter(deps.dashboard));
   authenticated.use('/assistant', createAssistantRouter(deps.assistant));
+  authenticated.use('/branding', createBrandingManagementRouter(deps.branding.management));
 
   api.use(authenticated);
   app.use('/api/v1', api);

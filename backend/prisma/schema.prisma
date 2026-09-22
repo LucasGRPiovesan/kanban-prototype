@@ -86,6 +86,7 @@ model User {
   comments            DemandComment[]    @relation("CommentAuthor")
   issuedCredentials   ProjectIntegrationCredential[] @relation("IntegrationCredentialCreatedBy")
   assistantSettings   AssistantSettings[]            @relation("AssistantSettingsUpdatedBy")
+  brandingSettings    BrandingSettings[]              @relation("BrandingSettingsUpdatedBy")
   watchedDemands      DemandWatcher[]
   notifications       Notification[]
 
@@ -416,4 +417,24 @@ model AssistantSettings {
 
   @@index([updatedByUserId], map: "ix_assistant_settings_updated_by")
   @@map("assistant_settings")
+}
+
+/// The installation's logos — one row, addressed by `scope`, the same shape as
+/// `AssistantSettings`. Each theme variant stores the opaque storage key the uploaded PNG
+/// lives at; `null` means "use the bundled generic mark" for that theme.
+model BrandingSettings {
+  id                  BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  uuid                String   @unique(map: "uq_branding_settings_uuid") @db.Char(36)
+  scope               String   @unique(map: "uq_branding_settings_scope") @db.VarChar(20)
+  logoLightStorageKey String?  @map("logo_light_storage_key") @db.VarChar(255)
+  logoDarkStorageKey  String?  @map("logo_dark_storage_key") @db.VarChar(255)
+  updatedByUserId     BigInt?  @map("updated_by_user_id") @db.UnsignedBigInt
+  createdAt           DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt           DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+
+  // SetNull: the configuration outlives whoever last touched it.
+  updatedBy User? @relation("BrandingSettingsUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([updatedByUserId], map: "ix_branding_settings_updated_by")
+  @@map("branding_settings")
 }
